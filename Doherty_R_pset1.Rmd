@@ -1,0 +1,369 @@
+---
+title: "DS-UA 201: Problem Set 1"
+author: Richie Doherty
+output: pdf_document
+date: "February 5, 2020"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+\begin{quote}\itshape
+This problem set is due at \textbf{11:59 pm on Thursday, February 13th}. The data are on the course website. 
+
+Please upload your solutions as a .pdf file saved as ``Yourlastname\_Yourfirstinitial\_pset1.pdf''). In addition, an electronic copy of your .Rmd file (saved as ``Yourlastname\_Yourfirstinitial\_pset1.Rmd'') must be submitted to the course website at the same time. We should be able to run your code without error messages. Please note on your problem set if you collaborated with another student and, if so, whom. In order to receive credit, homework submissions must be substantially started and all work must be shown. Late assignments will not be accepted.
+\end{quote}
+
+# Problem 1
+
+Researchers often want to aggregate and synthesize evidence from multiple studies of the same question to get a more precise estimate of the effect of a particular intervention. These sorts of studies are called *meta-analyses* and are very common in medical and psychological research where many experiments of varying size are often run in many different contexts. 
+
+We are going to replicate a meta-analysis using an example dataset from the *meta* suite in Stata of a series of experiments analyzing the effect of teacher expectations on student performance (*pupiliq.dta*). 
+
+From the description of the data available [here](https://www.stata.com/manuals/meta.pdf) (pp. 19)
+
+> This example describes a well-known study of Rosenthal and Jacobson (1968) that found the so-called Pygmalion effect, in which expectations of teachers affected outcomes of their students. A group of students was tested and then divided randomly into experimentals and controls. The division may have been random, but the teachers were told that the students identified as experimentals were likely to show dramatic intellectual growth. A few months later, a test was administered again to the entire group of students. The experimentals outperformed the controls. Subsequent researchers attempted to replicate the results, but many did not find the hypothesized effect.
+
+> Raudenbush (1984) did a meta-analysis of 19 studies and hypothesized that the Pygmalion effect might be mitigated by how long the teachers had worked with the students before being told about the nonexistent higher expectations for the randomly selected subsample of students.
+
+We will be working with the Raudenbush data set in R. First, load the data via the function `read_dta` from the `haven` package (part of the broader `tidyverse`).
+
+
+```{r, echo=T, message=F}
+
+### Read in the tidyverse
+library(tidyverse)
+
+### Load in the haven package
+library(haven)
+
+### Read in the pupiliq data
+pupil <- read_dta("pupiliq.dta")
+```
+
+
+This dataset contains the results of 19 replications of the teacher expectation experiment. The relevant variables you will need are:
+
+- `studylbl` - Author and date of the study
+- `stdmdiff` - Estimated standardized average effect (difference between treated and control)
+- `se` - Standard error of `stdmdiff`
+
+### Part A
+
+Consider the case of $K$ independent studies. Let $\hat{\tau_i}$ denote each study $i$'s estimator of the effect and $\sigma_i$ the known standard error of that estimator (assume that we know the true SE).
+
+One approach to a meta-analysis assumes that each $\hat{\tau_i}$ is an unbiased estimate of a common effect parameter $\tau$ and that differences between studies are attributable to sampling error.
+
+Consider the proposed combined estimator $\hat{\tau}$
+
+$$\hat{\tau} = \frac{\sum_{i = 1}^K  \frac{1}{\sigma_i^2} \hat{\tau_i}}{\sum_{i = 1}^K  \frac{1}{\sigma_i^2}} $$
+Find the expectation of $\hat{\tau}$. Is it an unbiased estimator of $\tau$?
+Take the expected value of $\hat{\tau}$
+\[ E[\hat{\tau}] = E[\frac{\sum_{i = 1}^K  \frac{1}{\sigma_i^2} \hat{\tau_i}}{\sum_{i = 1}^K  \frac{1}{\sigma_i^2}}]
+\]
+
+Move the expectation into Tau because of the linearity of expectation
+\[ = (\frac{\sum_{i = 1} ^ K\frac{1}{\sigma_i^2}E[\hat{\tau}]}{\sum_{i = 1} ^ K\frac{1}{\sigma_i^2}}) 
+\]
+Expectation of $\hat{\tau}$ is $\tau$ 
+\[ = (\frac{\sum_{i = 1} ^ K\frac{1}{\sigma_i^2}\tau}{\sum_{i = 1} ^ K\frac{1}{\sigma_i^2}}) 
+\]
+Pull out $\tau$ from the summation
+\[ (\frac{\tau\sum_{i = 1} ^ K\frac{1}{\sigma_i^2}}{\sum_{i = 1} ^ K\frac{1}{\sigma_i^2}})
+\]
+
+Cancellation of the summations of $\sigma_i^2$ result in
+\[ E[\hat{\tau}] = \tau
+\]
+
+It is an unbiased estimator because $E[\hat{\tau}] - \tau = 0$
+
+### Part B
+
+Find the variance of $\hat{\tau}$ (under the assumption that $\sigma_i$ is known for all $i$).  
+\[ \mathbb{V}(\hat{\tau}) = \mathbb{V}(\frac{\sum_{i = 1}^K  \frac{1}{\sigma_i^2} \hat{\tau_i}}{\sum_{i = 1}^K  \frac{1}{\sigma_i^2}})
+\]
+
+\[ = \mathbb{V}(\frac{1}{{\sum_{i = 1}^K  \frac{1}{\sigma_i^2}}}) * \mathbb{V}(\sum_{i = 1}^K  \frac{1}{\sigma_i^2} \hat{\tau_i})
+\]
+
+Move the variance inside the summation. The summation is a constant and the $\frac{1}{\sigma_i^2}$ gets squared
+
+\[ = (\frac{1}{{\sum_{i = 1}^K  \frac{1}{\sigma_i^2}}})^2 * (\sum_{i=1}^K \frac{1}{\sigma^4}\mathbb{V}(\hat{\tau_i}))
+\]
+
+The variance of $\hat{\tau_i}$ is $\sigma_i^2$
+
+\[= (\frac{1}{{\sum_{i = 1}^K  \frac{1}{\sigma_i^2}}})^2 * (\sum_{i=1}^K \frac{1}{\sigma_i^4} * \sigma_i^2)
+\]
+
+The $\sigma_i^2$ inside the summation cancels out with the  $\frac{1}{\sigma_i^4}$
+
+\[= (\frac{1}{{\sum_{i = 1}^K  \frac{1}{\sigma_i^2}}})^2 * (\sum_{i=1}^K \frac{1}{\sigma_i^2})
+\]
+
+The $= \sum_{i = 1}^k \frac{1}{\sigma_i^2}$ cancels with one of the $(\frac{1}{{\sum_{i = 1}^K  \frac{1}{\sigma_i^2}}})^2$
+
+$$\mathbb{V} = \frac{1}{\sum_{i=1}^K\frac{1}{\sigma_i^2}}$$
+
+### Part C
+
+With this estimator, $\hat{\tau}$, generate a point estimate for $\tau$ using the 19 studies in the `pupiliq.dta` dataset and construct a 95\% confidence interval (assuming asymptotic normality).
+
+``` {r}
+Point = list() #Create a list to hold the Y estimates
+#For loop to iterate estimates 
+for (i in pupil$study) {
+  estimate = pupil$stdmdiff / (pupil$se ^ 2) #the first estimation
+  Point <- estimate # add to estimate
+  Point_estimate <- sum(Point) / sum(1/pupil$se^2) # Summation and Division of Summation
+  return(Point_estimate)
+}
+#Creating The Confidence Interval
+#Redo it
+SE = sqrt(1/sum(1/pupil$se^2))
+Upper_limit <- Point_estimate + (1.96 * SE)
+Lower_limit <- Point_estimate - (1.96 * SE)
+CI = c(Lower_limit, Upper_limit)
+
+#Printing Results
+Point_estimate
+CI
+c(Point_estimate, CI)
+```
+
+### Part D
+
+How does your estimate from C compare to the results from the Rosenthal \& Jacobson, 1968 study (study 17 in the `pupiliq.dta` dataset)?
+``` {r}
+#Rosenthal \& Jacobson
+RJ <- pupil$se[17]
+RJ_CI_UP <- pupil$stdmdiff[17] + (1.96 * pupil$se[17])
+RJ_CI_LP <- pupil$stdmdiff[17] - (1.96 * pupil$se[17])
+RJ_CI <- c(RJ_CI_LP,RJ_CI_UP)
+#Comparing the two results
+print(c(RJ, Point_estimate))
+
+#Comparing 2 CI
+print(c(RJ_CI, CI))
+
+```
+RJ Srdmdiff is higher than my point estimate, it also has a wider Confidence interval which indicates that it has more variance than our estimator
+
+### Part E
+
+Suppose instead that someone suggested an alternate estimator for $\tau$, denoted $\widehat{\tau^{\prime}}$, that simply averaged all $K$ studies.
+
+$$\widehat{\tau^{\prime}} =  \frac{1}{K} \sum_{i = 1}^K \hat{\tau_i}$$
+Find the expectation and variance of this estimator. 
+Expectation:
+\[ E[\widehat{\tau^{\prime}}] = E[\frac{1}{K} \sum_{i = 1}^K \hat{\tau_i}]
+\]
+
+Pull out the constant $\frac{1}{K}$ and $\sum_{i = 1}^K$. $\sum_{i = 1}^K$ Converts to $\times K$
+
+\[ E[\widehat{\tau^{\prime}}] = \frac{1}{K} \times K \times E[\hat{\tau_i}]
+\]
+
+Simplification
+\[ E[\widehat{\tau^{\prime}}] = E[\hat{\tau_i}]
+\]
+
+\[ E[\widehat{\tau^{\prime}}] = \tau
+\]
+
+Variance:
+\[ \mathbb{V}[\widehat{\tau^{\prime}}] = \mathbb{V}[\frac{1}{K} \sum_{i = 1}^K \hat{\tau_i}]
+\]
+
+Pull out the constant $\frac{1}{K}$ and $\sum_{i = 1}^K$. $\sum_{i = 1}^K$ Converts to $\times K$ and $(\frac{1}{K})^2$
+
+\[ \mathbb{V}[\widehat{\tau^{\prime}}] = (\frac{1}{K})^2 \times K \times \mathbb{V}[\hat{\tau_i}]
+\]
+Simplication
+
+$$ \mathbb{V}[\widehat{\tau^{\prime}}] = \frac{\sigma_i^2}{K} $$
+
+
+### Part F
+
+With this alternate estimator, generate a point estimate and 95\% confidence interval (again assuming asymptotic normality) for $\tau$ using the 19 studies in the `pupiliq.dta` dataset. 
+
+``` {r}
+Point2 = list() #Creating the list
+for (i in pupil$study) {
+  Point2 <- pupil$stdmdiff #Adding Estimate to List
+  #Summation of list of estimates and division of K
+  Point_estimate2 <- sum(Point2) / length(pupil$study) 
+  return(Point_estimate2)
+}
+
+#Creating Confidence Interval
+SE2 = sqrt(sum(pupil$se^2)/length(pupil$study))
+Upper_limit2 = Point_estimate2 + (1.96 * SE2)
+Lower_limit2 = Point_estimate2 - (1.96 * SE2)
+CI2 = c(Lower_limit2, Upper_limit2)
+
+#Comparing Point Estimate and Confidence Interval
+print(Point_estimate2)
+print(CI2)
+print(c(Point_estimate2, CI2))
+```
+### Part G
+
+How do the two estimators $\widehat{\tau^{\prime}}$ and $\hat{\tau}$ compare? Which would you prefer to use and why?
+```{r}
+#Comparing two estimators
+print(c(Point_estimate, Point_estimate2))
+#Comparing CI
+print(c(CI, CI2))
+```
+Comparing Variances:
+Estimation 1:
+
+$$\mathbb{V} = \frac{1}{\sum_{i=1}^K \frac{1}{\sigma_i^2}}$$
+
+Estimation 2 :
+
+$$\mathbb{V}[\widehat{\tau^{\prime}}] = \frac{\sigma_i^2}{K}$$
+
+
+I would chose the first estimator because it will have a smaller variance, it will have less spread in the confidence interval for our pupil data.
+
+# Problem 2
+
+Many studies in political science have documented an effect of *ballot order* on a candidate's vote share in an election.[^1] In general, candidates that are listed first on a ballot receive a slightly higher vote share than those listed lower on the ballot. As a result, most states will randomize the order of candidates on the ballot and alter the order from ballot to ballot.
+
+In the 2008 Democratic Primary in New Hampshire, the ballot order was the same on all ballots. Furthermore, this fixed order was decided by randomly and unformly drawing a letter of the alphabet (A-Z) and then listing all candidates alphabetically by last name starting from the randomly chosen letter (and returning back to A after Z). In the actual primary election in 2008, the letter "Z" was drawn and therefore Joe Biden was first on all ballots. 
+
+Professor Jon Krosnick of Stanford University noted in an [op-ed](https://abcnews.go.com/PollingUnit/Decision2008/story?id=4107883&page=1) that this process may have advantaged some candidates more than others ex-ante due to the distribution of last names on the ballot.
+
+A total of 21 candidates were on the ballot in this election (ordered by last name below)
+
+| Name |
+|------|
+|Biden|
+|Caligiuri|
+|Capalbo|
+|Clinton|
+|Crow|
+|Dodd|
+|Edwards|
+|Gravel|
+|Hewes|
+|Hughes|
+|Hunter|
+|Keefe|
+|Killeen|
+|Koon|
+|Kucinich|
+|LaMagna|
+|Laughlin|
+|Obama|
+|Richardson|
+|Savior|
+|Skok|
+
+[^1]:  See, for example, Miller, Joanne M., and Jon A. Krosnick. "The impact of candidate name order on election outcomes." Public Opinion Quarterly (1998): 291-330; Ho, Daniel E., and Kosuke Imai. "Estimating causal effects of ballot order from a randomized natural experiment: The California alphabet lottery, 1978–2002." Public Opinion Quarterly 72.2 (2008): 216-240.
+
+### Part A
+
+Given the New Hampshire randomization process, what is the probability of Biden appearing as the first name on the ballot?
+
+Probability that any letter is randomly selected : $Y_i = \frac{1}{26}$
+PMF: $\sum_{i = 1}^K Y_i$
+
+$\frac{9}{26}$ random possibility of Biden appearing first on the ballot:
+If letter T-B were selected Biden would be the first canidate on the ballot because he is the first candidate available after the letter S..
+
+### Part B
+
+What is the probability of Obama appearing as the first name on the ballot?
+$\frac{3}{26}$ random probability of being selected first name on the ballot.
+M - O were selected Obama would be first on the ballot because he is the first name to appear after L
+
+### Part C
+
+Pollsters at the time noticed that the New Hampshire results in 2008 were significantly different from the average of polls leading up to the election. While Hillary Clinton finished 3 percentage points ahead of Barack Obama, the average of final poll estimates suggested Obama leading Clinton by 7 percentage points.[^2] In his op-ed, Krosnick suggested that Clinton may have beneffited in part from a ballot order effect. Given the New Hampshire randomization scheme, what is the probability of Hillary Clinton appearing above Barack Obama on the ballot?
+
+$\frac{14}{26}$ or $\frac{7}{13}$
+P - C were selected to be selected as the starting random letter then Clinton would be above Obama on the ballot list. 
+
+[^2]: [An Evaluation of the Methodology of the
+2008 Pre-Election Primary Polls](https://www.aapor.org/AAPOR_Main/media/MainSiteFiles/AAPOR_Rept_FINAL-Rev-4-13-09.pdf) 
+
+# Problem 3
+
+Suppose we have a sample of observations, each assigned a binary treatment $D_i \in \{0, 1\}$ with $D_i = 1$ indicating a unit is treated and $D_i = 0$ indicating the unit is assigned control. Assume $0 < Pr(D_i=1) < 1$. We observe an outcome $Y_i$ for each observation. Define potential outcomes $Y_i(1)$ and $Y_i(0)$, denoting the outcome observed for unit $i$ if it were assigned treatment ($Y_i(1)$) or control ($Y_i(0)$) respectively.
+
+### Part A
+
+What assumption do we need to make to write $E[Y_i(1) | D_i = 1] = E[Y_i | D_i = 1]$ and $E[Y_i(0) | D_i = 0] = E[Y_i | D_i = 0]$?
+
+We are making the consistency assumption, which bridges us from the potiential outcome to the observed outcome. The fact that there are not multiple versions of the treatment, it allows us to say that the observed outcome of $Y_i$ is the potiential outcome of $X_i = x $ 
+
+
+
+### Part B
+
+Making no further assumptions, write the simple difference in expectations  $E[Y_i | D_i = 1] - E[Y_i | D_i = 0]$ in terms of the average treatment effect on the treated $E[Y_i(1) - Y_i(0) | D_i = 1]$ and a remainder component.
+
+Simple Difference:
+\[ E[Y_i | D_i = 1] - E[Y_i | D_i = 0] = E[Y_i(1)|D_i = 1] - E[Y_i(0)| D_i = 0]
+\]
+
+Subtracting Counterfactuals:
+\[ = E[Y_i(1)|D_i = 1] - E[Y_i(0)| D_i = 0] - E[Y_i(0)|D_i = 1] + E[Y_i(0)| D_i = 1]
+\]
+
+Switching function around:
+\[ = E[Y_i(1)|D_i = 1]- E[Y_i(0)|D_i = 1] + E[Y_i(0)| D_i = 1] - E[Y_i(0)| D_i = 0]
+\]
+
+Combining Parts of the function, the rest in the remainder:
+$$E[Y_i(1) - Y_i(0)|D_i= 1] + E[Y_i(0)| D_i = 1] - E[Y_i(0)| D_i = 0]$$
+
+### Part C
+
+Now write the simple difference in expectations $E[Y_i | D_i = 1] - E[Y_i | D_i = 0]$ in terms of the average treatment effect on the control $E[Y_i(1) - Y_i(0) | D_i = 0]$ and a remainder component.
+Simple Difference:
+\[ E[Y_i | D_i = 1] - E[Y_i | D_i = 0] = E[Y_i(1)|D_i = 1] - E[Y_i(0)| D_i = 0]
+\]
+
+Subtracting Counterfactuals:
+\[ = E[Y_i(1)|D_i = 1] - E[Y_i(0)| D_i = 0] - E[Y_i(1)|D_i = 0] + E[Y_i(1)| D_i = 0]
+\]
+
+Switching function around:
+\[ = E[Y_i(1)|D_i = 0]- E[Y_i(0)|D_i = 0] + E[Y_i(0)| D_i = 1] - E[Y_i(0)| D_i = 0]
+\]
+
+Combining Parts of the function, Consistency Assumption the rest in the remainder:
+$$E[Y_i(1) - Y_i(0)|D_i= 0] + E[Y_i(1)| D_i = 1] - E[Y_i(0)| D_i = 0]$$
+
+### Part D
+
+Using your results from parts **B** and **C**, write the simple difference in expectations $E[Y_i | D_i = 1] - E[Y_i | D_i = 0]$ in terms of the average treatment effect $E[Y_i(1) - Y_i(0)]$ and a remainder component. Hint: Use the law of total probability to break up $E[Y_i(1) - Y_i(0)]$.
+
+Law of Total Expectation:
+$$E[\hat{Y_i}] = \sum_{i=1}^KE[Y_i| D_i =d] * P(D_i = d)$$
+
+Because we are using binary treatment assignment
+
+$$E[Y_i|D_i = 1]* P(D_i = 1) + E[Y_i|D_i = 0]* P(D_i = 0)$$
+
+Subsititue the ATT = SDE - R and ATC = SDE - R:
+$$=  (E[Y_i|D_i= 1] - E[Y_i|D_i= 0] - E[Y_i(0)| D_i = 1] + E[Y_i(0)| D_i = 0]) * P(D_i = 1)$$
+$$
+- (E[Y_i|D_i= 1] - E[Y_i| D_i = 0] + E[Y_i(0)| D_i = 0] - E[Y_i(1)| D_i = 1]) * P(D_i = 0)
+$$
+
+Apologies, I had issues printing the output
+
+## Part E
+
+Interpret your result from part **D**. Under what conditions will the difference in expectations identify the average treatment effect?
+
+Under the ingorbability conidition the remainder will be zero because we can subsitute the unobservable potiential outcomes with the observed outcomes. 
+

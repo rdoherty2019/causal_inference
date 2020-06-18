@@ -1,0 +1,654 @@
+---
+title: 'DS-UA 201: Problem Set 4'
+author: Anton Strezhnev
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+date: "April 15, 2020"
+---
+  
+  \begin{quote}\itshape
+This problem set is due at \textbf{12:00 pm on Friday, May 1st}. The data are on the course website. 
+
+Please upload your solutions as a .pdf file saved as ``Yourlastname\_Yourfirstinitial\_pset4.pdf''). In addition, an electronic copy of your .Rmd file (saved as ``Yourlastname\_Yourfirstinitial\_pset4.Rmd'') must be submitted to the course website at the same time. We should be able to run your code without error messages. Please note on your problem set if you collaborated with another student and, if so, whom. In order to receive credit, homework submissions must be substantially started and all work must be shown. Late assignments will not be accepted.
+
+\end{quote}
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.pos = 'h')
+```
+
+# Problem 1
+  
+Despite heated political and media rhetoric, there are few causal estimates of the effect of expanded healthcare insurance on healthcare outcomes. One landmark study, the [Oregon Health Insurance Experiment](https://www.ncbi.nlm.nih.gov/pubmed/23635051), covered new ground by utilizing a randomized control trial implemented by the state government of Oregon. To allocate a limited number of eligible coverage slots for the state's Medicaid expansion, about 30,000 low-income, uninsured adults (out of about 90,000 wait-list applicants) were randomly selected by lottery to be allowed to apply for Medicaid coverage. Researchers collected observable measures of health (blood pressure, cholesterol, and blood sugar levels), as well as hospital visitation and healthcare expenses for 6,387 selected adults and 5,842 not selected adults. 
+
+For this problem, you will need the `OHIE.dta` file. The variables you will need are:
+  
+`treatment` - Selected in the lottery 
+
+`ohp_all_ever_admin` -  Ever enrolled in Medicaid from matched notification date to September 30, 2009 (actually "took" the treatment)
+
+`tab2bp_hyper` - Outcome: Binary indicator for elevated blood pressure (defined a systolic pressure of 140mm Hg or more and a diastolic pressure of 90mm Hg or more)
+
+`tab2phqtot_high` - Outcome: Binary indicator for a positive screening result for depression (defined as a score of 10 or higher\ on the Patient Health Questionaire - 8)
+
+`tab4_catastrophic_exp_inp` - Outcome: Indicator for catastrophic medical expenditure (total out-of-pocket medical expenses $\geq$ 30\% of household income)
+
+`tab5_needmet_med_inp` - Outcome: Participant feels that they received all needed medical care in past 12 months (binary indicator)
+
+```{r}
+library(tidyverse)
+library(haven)
+library(estimatr)
+q1_data <- read_dta("OHIE.dta")
+```
+## Question A
+
+Estimate the intent-to-treat effects of assignment to treatment (being eligible to apply) on each of the four outcomes (elevated blood pressure, depression, catastrophic medical expenditure, and whether respondents had their health care needs met). Provide 95\% confidence intervals for each estimate and interpret your results.
+```{r}
+summary(lm_robust(tab2bp_hyper ~  treatment, data = q1_data))
+```
+
+For the ITT of our instrument and the outcome  we have a very small estimate of $-.0016$ and a confidence interval of $(-.015, .011)$. We would fail to reject the null of no treatment assignment effect when it comes to medicare assignment on high bloodpressure even though we observe a small decrease in blood pressure when people are assigned to medicare
+
+```{r}
+summary(lm_robust( tab2phqtot_high ~ treatment , data = q1_data))
+```
+
+For the ITT of our instrument and the outcome of positive screening for depression we have a very small estimate of $-.034$. This means assignment to medicare drops the postive screening score out of 10 by .04. Our confidence interval of $(-.051, -0.019)$ does not contain zero so we would reject the null of no treatment assignment effect with a 95\% confidence level
+
+```{r}
+summary(lm_robust( tab4_catastrophic_exp_inp ~ treatment, data = q1_data))
+```
+
+For the ITT of our instrument and the outcome catastrophic medical expenditure we have a small estimate of $-.015$. That would mean assignment to medicare reduces catastrophic medical expenditures greater than 30\% of houeshold income by .015. Our confidence interval of $(-.02287, -0.007)$ does not contain zero so we would reject the null of no treatment assignment effect with a 95\% confidence level
+
+```{r}
+summary(lm_robust(tab5_needmet_med_inp  ~ treatment, data = q1_data))
+```
+
+For the ITT of our instrument and the outcome of patients that feel they have received all of their medical care we have a small estimate of .03. That would mean that patients assigned to medicare have on average feel .03 higher in percieved medical care. Our confidence interval is (.017,.051) we would reject the null of no treatment assignment effect with a 95\% confidence level. 
+
+## Question B
+
+Suppose that researchers actually wanted to estimate the effect of Medicaid enrollment on each of the four outcomes. Suppose they first used a naive regression of each of the the outcomes on the indicator of Medicaid enrollment. Report a 95\% confidence interval for each of your estimates and interpret your results. Why might these be biased estimates for the causal effect of Medicaid enrollment?
+
+```{r}
+summary(lm_robust(tab2bp_hyper ~ ohp_all_ever_admin , data = q1_data))
+```
+
+For the naive difference in medicare enrollment and the outcome for high blood pressure we have a very small estimate of $-.018$ and a confidence interval of $(-.032, -.004)$. We wouldreject the null of no treatment assignment when it comes to medicare enrollment on high bloodpressure. We observe in our population that medicare enrollments reduce the occurences of a patient having high blood pressure by .018.
+
+This may be biased because users that comply with their assignment to medicare may be more likely to focus on their health than the patients who chose not to enroll in medicare. 
+
+```{r}
+summary(lm_robust(tab2phqtot_high ~  ohp_all_ever_admin, data = q1_data))
+```
+
+For the naive difference in means of medicare enrollment on the outcome of positive screening for depression we have a very small estimate of .049. This means enrollment in medicare increases the postive screening score out of 10 by .049. Our confidence interval of (.0312, 0.067) does not contain zero so we would reject the null of no treatment assignment effect with a 95\% confidence level.
+
+This may be biased because users that may comply with their medicare assignment and enroll in the program may have prexisiting conditions that they would seek out like depression. Another factor is that the users in the control group may have under reported depression whic could skew our estimate. 
+
+```{r}
+summary(lm_robust(tab4_catastrophic_exp_inp ~ ohp_all_ever_admin, data = q1_data))
+```
+
+For the naive difference in means of enrollment in medicare and the outcome catastrophic medical expenditure we have a small estimate of $-.01$. That would mean enrollment to medicare reduces catastrophic medical expenditures greater than 30\% of houeshold income by .01. Our confidence interval of $(-.0187, -0.0028)$ does not contain zero so we would reject the null of no treatment assignment effect with a 95\% confidence level.
+
+This may be biased because the person that may be more likely to enroll in medicare when assigned may alos care more about their health. The focus on their health might lower their future medical expenses. 
+
+```{r}
+summary(lm_robust( tab5_needmet_med_inp ~ ohp_all_ever_admin, data = q1_data))
+```
+
+For the naive estimate of medicare enrollment and the outcome of patients that feel they have received all of their medical care we have a small estimate of .061. That would mean that users who enrolled to medicare have on average feel .061 higher in percieved medical care. Our confidence interval is (.043, .0799) we would reject the null of no treatment effect with a 95\% confidence level. 
+
+This may be biased because someone who may enroll in medicare when assigned is more likely to get the most out of their health care regardless of whether they enroll
+
+## Question C
+
+Suppose we were to use assignment to treatment as an instrument for actually receiving Medicaid coverage.
+
+Consider that not everyone who was selected to apply for Medicaid actually ended up applying and receiving coverage. Likewise, some applicants who were not selected to receive the treatment nevertheless were eventually covered. What were the compliance rates (the level of Medicaid enrollment) for subjects who were selected and subjects who were not selected? Use a "first stage" regression to estimate the effect of being selected on Medicaid enrollment to estimate the compliance rates. Is the instrument of assignment-to-treatment a strong instrument for actual Medicaid enrollment?
+
+```{r}
+#regression effect of Z on D
+summary(lm_robust(ohp_all_ever_admin ~  treatment,data = q1_data))$coefficients
+
+
+```
+Yes it is a strong relationship because are going to have a first stage that is large and won't be near zero.
+
+## Question D
+
+Discuss whether the exclusion restriction holds in this design.
+
+I believe the exclusion restriction holds because the assignment to medicare can only affect the user if the engage and enroll in the medicare 
+
+## Question E
+
+Now estimate the effect of Medicaid enrollment on each of the four outcomes using an instrumental variables strategy. Report a 95\% confidence interval for your estimates and interpret your results. Compare the estimates to those you obtained in Question C.
+
+```{r}
+#first stage
+first <- lm_robust(ohp_all_ever_admin ~ treatment ,data = q1_data)
+first
+```
+
+As we saw earlier we have a strong first stage effect.
+
+```{r}
+#IV
+iv_robust(tab2bp_hyper ~ ohp_all_ever_admin| treatment,data = q1_data)
+```
+
+For the estimate of our LATE we observed a $-.01$. A drop in indicated high blood pressure for our compliers of medicare, we would fail to reject the null of no treatment effect because our confidence interval of $-.06, .04$ contains zero. Compared to the Naive ate is a smaller estimate.
+
+```{r}
+iv_robust(tab2phqtot_high ~ ohp_all_ever_admin | treatment,data = q1_data)
+```
+
+For the estimate of our LAte we observed $-.13$. A drop in indicated depression for compliers of medicare. we would reject the null of no treatment effect of enrolling in medicare on indicated depression because zero does not fall within our confidence interval of $-.2 , -.07$. Compared to our Naive ate we have an opposite estimate. 
+
+```{r}
+iv_robust(tab4_catastrophic_exp_inp ~ ohp_all_ever_admin | treatment,data = q1_data)
+```
+
+For the estimate of our LAte we observed a $-.06$. A drop in Catostrohic medical expense for medicare compliers. We would reject the null of no treatment effect of complying with medicare on catostrophic medical expense for compliers. Our confidence interval of $-.09 and -.03$ does not contain zero. Compared to our estimate earlier we observed an estimate much closer to zero.
+
+```{r}
+iv_robust( tab5_needmet_med_inp ~ ohp_all_ever_admin | treatment,data = q1_data)
+
+```
+
+For our estimate of the Late we observed a .13 bump in the compliers indication on feeling they received all of their medical care. We would rejet the null of no treatment effect with 95\% confidence level because zero does not fall within our confidence interval of .06 , .2
+
+## Problem F
+
+What additional assumptions do you have to make in order to interpret your estimates from Question E as an Average Treatment Effect for the entire sample?
+
+We would have to assume that the compliers are similar to the rest of the sample for us to cast the LATE to the rest of the sample.
+
+## Problem G
+
+The dataset includes 7 individual covariates 
+
+`tab1_gender_inp` - gender (0 - Male, 1 - Female, 2 - Transgender)
+
+`tab1_age_19_34_inp` -  Age 19-34
+
+`tab1_age_35_49_inp`- Age 35-49
+
+`tab1_race_black_inp` - Race/ethnicity is Black
+
+`tab1_race_nwother_inp`  - Race/ethnicity is non-White/other
+
+`tab1_race_white_inp`  - Race/ethnicity is White
+
+`tab1_hispanic_inp`  - Hispanic/Latino
+
+Using the results we studied on how to construct covariate profiles for compliers (Abadie's kappa weighting), compute the covariate distribution among compliers for each of these 7 covariates. How does the demographic distribution for compliers compare to the distribution in the full sample? For which covariates are these differences the largest?
+
+```{r}
+
+pZ_i <- mean(q1_data$treatment)
+
+q1_data['male'] <- q1_data$tab1_gender_inp == 0
+q1_data["Female"] <- q1_data$tab1_gender_inp == 1
+
+
+q1_data$kappa <- 1 - ( q1_data$ohp_all_ever_admin * ( 1 - q1_data$treatment ) ) / ( 1 - pZ_i ) - ( ( 1 -  q1_data$ohp_all_ever_admin) * (q1_data$treatment ) ) / ( pZ_i )
+
+
+mean( q1_data$male, na.rm = TRUE)
+## Complier Male
+weighted.mean(q1_data$male, q1_data$kappa, na.rm = TRUE)
+
+
+mean( q1_data$Female, na.rm = TRUE)
+#complier female
+weighted.mean(q1_data$Female, q1_data$kappa, na.rm = TRUE)
+```
+
+even on male and female
+
+```{r}
+
+mean(q1_data$tab1_age_19_34_inp, na.rm = TRUE)
+
+## Complier age 19-34
+weighted.mean(q1_data$tab1_age_19_34_inp, q1_data$kappa, na.rm = TRUE)
+
+
+
+mean(q1_data$tab1_age_35_49_inp, na.rm = TRUE)
+## Complier age 35-49
+weighted.mean(q1_data$tab1_age_35_49_inp, q1_data$kappa, na.rm = TRUE)
+```
+
+The compliers seem to be proportionaly older than the population of data
+
+```{r}
+# Race
+
+#Black
+mean(q1_data$tab1_race_black_inp, na.rm = TRUE)
+## Complier Black
+weighted.mean(q1_data$tab1_race_black_inp, q1_data$kappa, na.rm = TRUE)
+```
+
+Compliers are slightly more African American
+
+```{r}
+#Non white
+mean(q1_data$tab1_race_nwother_inp, na.rm = TRUE)
+## Complier non white
+weighted.mean(q1_data$tab1_race_nwother_inp, q1_data$kappa, na.rm = TRUE)
+```
+
+Compliers are less non white
+
+```{r}
+#white
+mean(q1_data$tab1_race_white_inp, na.rm = TRUE)
+## Complier white
+weighted.mean(q1_data$tab1_race_white_inp, q1_data$kappa, na.rm = TRUE)
+```
+
+compliers are more white then population
+
+```{r}
+#hispanic
+mean(q1_data$tab1_hispanic_inp, na.rm = TRUE)
+## Complier hispanic
+weighted.mean(q1_data$tab1_hispanic_inp, q1_data$kappa, na.rm = TRUE)
+```
+
+compliers are less hispanic
+
+From profiling the compliers it seems that the compliers differ from the sample averages mostly on race. We found that the compliers are proportionaly 75\% white where as the sample only has 68\% white. Hispanics are 7\% points lower in the complier population when compared to the sample, african americans are 4 points lower in the complier subset than the sample. 
+
+# Problem 2
+
+Does having a daughter (as opposed to a son) affect how U.S. legislators vote on women's issues? [Washington (2008; American Economic Review)](https://www.aeaweb.org/articles?id=10.1257/aer.98.1.311) finds that having a daughter causes a legislator to vote more liberally, especially on issues related to women. You will examine this using the `washington.dta` dataset. While the original paper looks at the 105th - 108th Congresses, this dataset will focus on representatives in the 105th (1997-1999).
+
+The variables you will need are:
+
+`aauw` - Outcome variable - Legislator's voting score as assigned by the American Association of University Women (AAUW) (proxy for feminist/liberal-leaning voting record). Positive values indicate more liberal/feminist voting behavior.
+
+`ngirls` - Number of female children
+
+`nboys` - Number of male children
+
+`totchi` - Total number of children
+
+## Question A
+
+Our treatment of interest is a multi-valued treatment -- the number of female children of a legislator is a count variable ranging from $0$ to $7$. While we could estimate the effects for each possible comparison (e.g. the effect of having 5 girls vs. 2 girls or 3 girls vs. 0 girls), this will yield very high-variance estimates. Instead, we would like to pool our effect estimates into a single summary estimate of the Average Treatment Effect of having one additional daughter on the legislator's AAUW score.
+
+Let's define a set of potential outcomes $Y_i(d)$ for all possible values of a treatment $d \in \mathcal{D}$. We again assume consistency: that for a unit with treatment level $D_i = d$, the observed outcome $Y_i$ equals the potential outcome $Y_i(d)$.
+
+One way of summarizing the effect of treatment is to assume that the expected value of the marginal potential outcomes is a linear function of the treatment.
+
+$$
+E[Y_i(d)] = \alpha_0 + \alpha_1 d
+$$
+
+In terms of the model parameters, what is the average treatment effect of having 3 daughters versus having 0 daughters? How about the average treatment effect of having 5 daughters versus 2 daughters? What is the ATE of having $d+1$ daughters versus $d$ daughters? 
+
+3 daughters versus having 0 daughters is going to be the effect of having 3 children. This is because intercepts cancel out when subtracted from each other, they are constant and when $D = 0$ the alpha effect will disappear and the alpha times $D=3$ will remain
+
+5 daughters versus 2 daughters is going to be the effec of having 5 children minus the effect of having 3 children. The intercepts will cancel from one another and we are left with $\alpha_i(5) - \alpha_i(2)$. 
+
+The ATE of having $d+1$ daughters versus $d$ daughters is going to be the effect of having $D+1$ children minus the effect of having D children. Again the interecpts cancel and we are left with $\alpha_i(d+1) - \alpha_i(d)$. 
+
+
+## Question B
+# We talked about ols is blue what assumptions give us an unbiased assumption
+We'll start by assuming that the number of female children is completely ignorable with respect to the outcome. In other words
+$$
+E[Y_i(d) | D_i] = E[Y_i(d)]
+$$
+
+Note that in a bivariate linear regression, we assume that the conditional expectation function has the form
+
+$$
+E[Y_i | D_i] = \beta_0 + \beta_1 D_i
+$$
+
+Show that when treatment ($D_i$) is completely ignorable and the model for the marginal expected potential outcomes from Question A is true, the bivariate regression parameter $\beta_1$ identifies the average treatment effect of having one additional daughter.
+
+The bivariaate regression parameter identifies the ATE of having one additional daughter because:
+Ignorability allows us to impute $E[Y_i(D_i) | D_i = d] = E[Y_i(d)]$
+
+Consistency allows use to use the observed potential outcomes to de-mean the observations. De-meaning the observations helps use measure the covariance between the outcomes and the treatment variable and find $beta_i$ .
+
+## Question C
+
+Assuming that the number of daughters is completely ignorable, use a linear regression to estimate the average treatment effect of having one additional daughter on a legislator's AAUW score. Report a 95\% confidence interval for your estimate and interpret your results.
+
+```{r}
+q2_data <- read_dta("washington.dta")
+model <- lm_robust(aauw ~ ngirls, data = q2_data)
+model
+```
+
+We have a point estimate of $-2.79$ and a confidence interval of $-6.23$, .666. We would fail to reject the null of no treatment effect. Our findings suggest that having an additional daughter drops the AAUW score by 2.79.
+
+## Question D
+
+Consider that while the sex of an individual child may be as good-as-random (assuming legislators are not practicing sex-selective fertility techniques), the total number of girls that a legislator has is a direct consequence of the total number of children that he or she has. We might expect different types of legislators to choose to have different numbers of children and that these factors could be associated with political attitudes. 
+
+Calculate the mean AAUW voting score for legislators with 0 total children, 1 total child, 2 total children, 3 total children, 4 total children, 5 total children and 6 or more total children. Explain how and in what direction failing to adjust for the total number of children (`totchi`) will bias the estimated causal effect.
+
+```{r}
+zero_child = subset(q2_data, totchi == 0)
+mean(zero_child$aauw)
+```
+
+```{r}
+one_child = subset(q2_data, totchi == 1)
+mean(one_child$aauw)
+```
+
+```{r}
+two_child = subset(q2_data, totchi == 2)
+mean(two_child$aauw)
+```
+
+```{r}
+three_child = subset(q2_data, totchi == 3)
+mean(three_child$aauw)
+```
+
+```{r}
+four_child = subset(q2_data, totchi == 4)
+mean(four_child$aauw)
+```
+
+
+```{r}
+five_child = subset(q2_data, totchi == 5)
+mean(five_child$aauw)
+```
+
+```{r}
+six_child = subset(q2_data, totchi >= 6)
+mean(six_child$aauw)
+```
+
+It seems that if we do not condotion for the number of children the bias for our estimated effect will be negative. As we see from the data there is a slight increase in AAUW score after 1 child increase but then after that the mean of AAUW steadily declines. If we don't control for the number of children our effect will be smaller than the actual effect of having one more daughter on the AAUW score.
+
+its a confounder, total number of children tell you something about that person.
+
+## Question E
+
+For the remainder of this problem, we will attempt to estimate the ATE of having an additional child under the assumption that the total number of girls is *conditionally* ignorable given the legislator's total number of children.
+
+First, consider the representatives with $0$ total children. What assumption is violated in trying to estimate the average treatment effect of having an additional girl conditional on total children for representatives with this covariate value?
+
+Positivity is violated if we condition on representatives with 0 total children because there is no probability of them being selected in the to treatment group $d + 1$. 
+
+## Question F
+
+In Question A, we assumed a model for the *marginal* potential outcomes. Let's assume a similar model for the the *conditional* potential outcomes, allowing the treatment effect to vary depending on $X_i$:
+
+$$
+E[Y_i(d) | X_i = x] = \alpha_{0x} + \alpha_{1x} d
+$$
+
+Which parameter represents the conditional average treatment effect of having one additional daughter given $X_i = x$: $E[Y_i(d + 1) - Y_i(d) | X_i = x]$?
+
+$alpha$ is the parameter that represent the CATE of having one additional daughter conditional on total number of children. 
+
+When you do the Difference in outcomes for $d + 1$ and d:
+
+$$
+\alpha_{0x} + \alpha_{1x}(d+1) - (\alpha_{0x} + \alpha_{1x}(d))
+$$
+
+The intercepts cancel and we distribute alpha.
+
+$$
+\alpha_{1x}d + \alpha_{1x} - \alpha_{1x}d
+$$
+
+Finally we are left with alpha our parameter
+
+## Question G
+
+Write an expression for the average treatment effect of having one additional daughter $E[Y_i(d + 1) - Y_i(d)]$ in terms of the conditional average treatment effects from Question F. (Hint: Remember the Law of Total Expectation).
+
+$$
+\tau = E[Y_i(d + 1)|X_i = x] - E[Y_i(d) | X_i = x]
+$$
+
+Because of consistency and conditional igorability we can combine these two expectations under the same condition
+
+$$
+\tau =  E[Y_i(d + 1) - Y_i(d) | X_i = x]
+$$
+
+Because of the total law of expectation the expected value of a conditonal treatment effect is the same as the expected value of our treatment effect times the density of our condition in the sample space
+
+$$
+\tau = E[Y_i(d + 1) - Y_i(d)] P(X_i=x)
+$$
+
+To get the get the ATE we aggregate up and weight based on the density of the specific $X_i$.
+
+$$
+\tau = \frac{1}{n}\sum{E[Y_i(d + 1) - Y_i(d)] P(X_i=x)}
+$$
+
+## Question H
+
+
+Subset the sample to representatives with at least 1 child (of any sex) and no more than 5 total children (as there are very few representatives with $6+$ children). We'll be working with this sample for the rest of the problem.
+
+```{r}
+subset_q2_data <- subset(q2_data, (totchi >= 1) & (totchi <=5))
+```
+
+Estimate the conditional average treatment effect of having an additional daughter for each value of 'total children' (1 through 5). (Hint: You should think of this problem in terms of 5 separate bivariate regressions). Provide a 95\% robust confidence interval for each estimate and interpret your results.
+
+```{r}
+one_q2_data <- subset(subset_q2_data, (totchi == 1))
+one <- lm_robust(aauw ~ ngirls, data = one_q2_data)
+one
+```
+
+COnditional on having total number of children equalling 1 our ATE is $-15.827$ with a large standard error, we would fail to reject the null of no treatment effect because zero falls within our condifence interval of $-43, 11$.
+
+```{r}
+two_q2_data <- subset(subset_q2_data, (totchi == 2))
+two <- lm_robust(aauw ~ ngirls , data = two_q2_data)
+two
+```
+
+COnditional on having total number of children equalling 2 our ATE is $14.827$ with a large standard error, we would fail to reject the null of no treatment effect because zero falls within our condifence interval of $3, 25$.
+
+```{r}
+three_q2_data <- subset(subset_q2_data, (totchi == 3))
+three <- lm_robust(aauw ~ ngirls , data = three_q2_data)
+three
+```
+
+COnditional on having total number of children equalling 3 our ATE is 8.29, we would fail to reject the null of no treatment effect because zero falls within our condifence interval of $-1.2, 17$.
+
+```{r}
+four_q2_data <- subset(subset_q2_data, (totchi == 4))
+four <- lm_robust(aauw ~ ngirls, data = four_q2_data)
+four
+```
+
+COnditional on having total number of children equalling 4 our ATE is 1.214, we would fail to reject the null of no treatment effect because zero falls within our condifence interval of $-10.2, 12$.
+
+```{r}
+five_q2_data <- subset(subset_q2_data, (totchi >= 5))
+five <- lm_robust(aauw ~ ngirls, data = five_q2_data)
+five
+```
+
+COnditional on having total number of children equalling 5 our ATE is 7.69, we would fail to reject the null of no treatment effect because zero falls within our condifence interval of $-7, 22$.
+
+```{r}
+ subset_q2_data<- subset_q2_data %>% 
+  mutate(fifth = case_when(totchi == 5  ~ 1,
+                          totchi != 5 ~ 0),
+         fourth = case_when(totchi == 4 ~ 1,
+                           totchi != 4 ~ 0),
+         third = case_when(totchi == 3 ~ 1,
+                           totchi != 3 ~ 0),
+         second = case_when(totchi == 2 ~ 1, 
+                           totchi != 2~ 0),
+         one = case_when(totchi == 1 ~ 1,
+         totchi != 1 ~ 0))
+ subset_q2_data= subset_q2_data %>% unite("strata", fifth, fourth, third, second, one, remove = FALSE)
+table(subset_q2_data$strata)
+```
+
+## Question I
+
+A lot of our conditional estimates are pretty high variance - we'd instead like a single summary of the average treatment effect *averaged over* our sample. Using your expression from Question G, estimate the average treatment effect of having an additional daughter on AAUW voting score (for the subset of legislators with $1-5$ total children). Use a pairs bootstrap with 1000 iterations to provide an estimate of the standard error (Hint: Starting with the $1-5$ child subset, for each iteration: resample observations with replacement and replicate the procedure you used to generate the point estimate). Generate a 95\% confidence interval and interpret your results. How did adjusting for the total number of children change the estimated average treatment effect (relative to your estimate from C)?
+
+```{r}
+### Bootstrap for SEs
+set.seed(48093)
+nBoot <- 1000 # Number of iterations
+boot_results <- rep(NA, 1000)
+for (iter in 1:nBoot){
+  # Resample w/ replacement
+  q2_data_boot <- subset_q2_data[sample(1:nrow(subset_q2_data), nrow(subset_q2_data), replace=T),]
+  strat_results <- rep(NA,5)
+  for (num in c(1,2,3,4,5)){
+    boot_subset <- subset(q2_data_boot, totchi == num)
+    strat_results[num] <- lm_robust(aauw ~ ngirls, data = boot_subset)$coefficients[2]
+  }
+    
+  ## Store bootstrapped strata estimate
+  boot_results[iter] <- weighted.mean(c(strat_results),c(length(subset(q2_data_boot, totchi == 1))/length(q2_data_boot$aauw),
+                                      length(subset(q2_data_boot, totchi == 2))/length(q2_data_boot$aauw),
+                                      length(subset(q2_data_boot, totchi == 3))/length(q2_data_boot$aauw),
+                                      length(subset(q2_data_boot, totchi == 4))/length(q2_data_boot$aauw),
+                                      length(subset(q2_data_boot, totchi == 5))/length(q2_data_boot$aauw)))
+}
+
+se <- sd(boot_results)
+strata_ate <- weighted.mean(c(five$coefficients[2],
+                              four$coefficients[2],
+                              three$coefficients[2],
+                              two$coefficients[2],
+                              one$coefficients[2]), 
+                            w = c(length(five_q2_data$aauw)/length(subset_q2_data$aauw),
+                                  length(four_q2_data$aauw)/length(subset_q2_data$aauw),
+                                  length(three_q2_data$aauw)/length(subset_q2_data$aauw),
+                                  length(two_q2_data$aauw)/length(subset_q2_data$aauw),
+                                  length(one_q2_data$aauw)/length(subset_q2_data$aauw)))
+
+c(c("ATE", strata_ate), c("SE", se))
+c("CI", strata_ate - 1.96 * se, strata_ate + 1.96 * se)
+
+```
+
+We would fail reject the NUll of no treatment effect of having one daughter on the AAUW score of Representatives with a 95\% confidence level because zero falls inside our Confidence Intervel of $(-.1, 13)$. Our estimate of 6.76 larger than our naive estimate and what we expect. We would expect that conditional on the number of children adding an additional daughter to a representative will likely vote more liberal. 
+
+## Question J
+
+Another approach to conditioning on $X_i$ is to simply put it in the regression model. Estimate a multivariate additive linear regression including both the number of daughters ($D_i$) and the total number of children ($X_i$) (assuming the following outcome model):
+$$
+E[Y_i | D_i, X_i] = \beta_0 + \beta_1 D_i + \beta_2 X_i
+$$
+
+Report the coefficient on `ngirls` and provide a 95\% confidence interval. Interpret this estimate of the average treatment effect of having one additional daughter and discuss some of the reasons why it would differ from your estimate in Question I.
+
+```{r}
+lm_robust(aauw ~ ngirls + totchi, data = subset_q2_data)
+```
+
+Our point estimate of 7.33 is the highest we have seen so far, and higher than our estimate in point I. This is because we have removed the bias of total number of children by conditioning on it. 
+
+Our confidence interval ranges from $-1.89 to 12.77$, we would fail to reject the null of no treatment effect because our confidence interval contains zero.
+
+# Problem 3
+
+Does US military assistance strengthen or further weaken fragile and conflict-affected foreign governments? Aid may bolster state capacity and suppress violence from nonstate actors such as paramilitary groups. On the other hand, aid may be diverted to those same violent groups.
+To answer the question, [Dube and Naidu 2015](https://www.journals.uchicago.edu/doi/10.1086/679021?mobileUi=0) leverage changes in the allocation of US military aid to Colombian military bases. They test whether Colombian muncipalities in which military bases are located have more or less paramilitary violence when the level of U.S. military aid increasses, relative to Colombian muncipalities in which military bases are not located.  
+
+For this problem, you will need the `bases_replication_final.dta` file. The variables you will need are:
+  
+`parattq` - DV here is paramilitary attacks 
+
+`bases6` - indicator variable whether or not there is a base in the municipality
+
+`lrmilnar_col` - (logged)  U.S. military and narcotics aid to Colombia
+
+`bases6xlrmilnar_col` - the treatment i.e., the interaction between the level of U.S. military and narcotics aid and whether or not there is a base in the municipality 
+
+`lnnewpop` - is log of population 
+
+## Problem A
+
+The treatment in this case is a continuous ``intensity" variable that changes over time. The authors use the interaction between the level of U.S. military and narcotics aid and whether a base exists in a municipality. How many units are in the "control" group (no bases)? Does the bases variable change over time or is it a unit-constant factor? How about the logged military aid variable, does it change across units for a given year? What do the authors seem to be assuming about how military aid is allocated?
+
+```{r}
+q3_data <- read_dta("bases_replication_final.dta")
+
+# Interaction Treatment term = 0 for control
+
+sum(q3_data$bases6xlrmilnar_col == 0)
+```
+
+```{r}
+#Does base variable change over a given year for a municipality 
+grouped_base <- aggregate(q3_data[,"bases6"], list(q3_data$municipality), mean)
+changed_bases <- (grouped_base$bases6 != 0) & (grouped_base$bases6 != 1)
+sum(changed_bases)
+```
+
+```{r}
+year <- subset(q3_data, year == 2000)
+grouped_year <- aggregate(year[, "lrmilnar_col"], list(year$municipality) , mean)
+grouped_year
+```
+
+16272 municiplaties are in the control group. The base variables do not change over time, it is a constant unit factor.The logged aid variable does not change across units for a given year. The assumption the authors are making is that the aid is allocated for a fixed amount each given year.
+
+## Problem B
+
+The authors use a common empirical strategy called \emph{two-way fixed effects} to estimate the average treatment effect of military aid. The model they estimate includes fixed effects for both time periods and units (and includes logged population as an additional covariate):
+  $$Y_{it} = \gamma_t + \alpha_i + \tau D_{it} + \beta X_{it} +  \varepsilon_{it}$$
+  
+What assumptions are the authors making in order to identify the treatment effect of military aid? 
+
+The authors are making a parrell trends assumption, assumming that the the selection bias in time 1 after military aid is the same as the selection bias in time 0 before military aid. This allows use to observed the potential outcomes under control from time 0 and time 1 in the treated group is the same as the observed trend in the control group. We can then compute a difference in difference between the pretreatment and post treatment period.
+
+We are alo assuming no interfence between municipality populations who do and don't receive treatment.
+
+We are also assuming there is no unobserbed confounder that is affecting both the treatment, the aid and the outcome the number of attacks. 
+
+ 
+## Problem C
+  
+Why can't we use the following, seemingly more general, fixed effect model, with a different intercept for each unit-period combination? $$Y_{it} = \alpha_{it} + \tau D_{it} + \varepsilon_{it}$$
+
+If we created a different intercept for each unit period combination we would end up with 660 intercepts and we would have more intercepts than observations.
+
+## Problem D
+  
+Using the two-way fixed effects estimator, estimate the effect of U.S. military and narcotics aid on the number of paramilitary attacks, including log of population as a covariate. The two sets of fixed effects are for municipality (`municipality`) and year (`year`). Cluster your standard errors at the unit level (see the `cluster` argument in `lm_robust`. Report a 95\% confidence interval for your estimate and interpret your results. 
+
+```{r}
+#two way fixed effects estimate
+#factor out year and county code dummies
+#cluster data set at county
+m1 <- lm_robust(paratt ~ bases6xlrmilnar_col+lnnewpop+as.factor(year)+as.factor(municipality), 
+                 clusters=municipality,se_type = "CR0", data = q3_data)
+summary(m1)$coefficients[c(1:2),c(1:6) ]
+
+
+```
+
+
+Our point estimate of .150 indicates that the logged aid resulted in .15 more attacks on bases for the treated group than the control group. We reject the null of no treatment effect with a 95\% confidence level because 0 is outside of our confidence interval of .03 , .27. 

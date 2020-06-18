@@ -1,0 +1,565 @@
+---
+title: 'DS-UA 201: Problem Set 2'
+author: "Richie Doherty"
+date: "February 19, 2020"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+opinion <- read.csv('opinion_data.csv', stringsAsFactors=FALSE)
+```
+
+\begin{quote}\itshape
+This problem set is due at \textbf{11:59 pm on Thursday, February 27th}. The data are on the course website. 
+
+Please upload your solutions as a .pdf file saved as ``Yourlastname\_Yourfirstinitial\_pset2.pdf''). In addition, an electronic copy of your .Rmd file (saved as ``Yourlastname\_Yourfirstinitial\_pset2.Rmd'') must be submitted to the course website at the same time. We should be able to run your code without error messages. Please note on your problem set if you collaborated with another student and, if so, whom. In order to receive credit, homework submissions must be substantially started and all work must be shown. Late assignments will not be accepted.
+\end{quote}
+
+
+
+# Problem 1
+
+You will need the `opinion_data.csv` dataset (available on the course website) to work through this problem. This dataset comes from a pilot study for an experiment developed by Madsen et. al. (pre-registered [here](\https://egap.org/registration/6366)).  As nativist and right-wing populist movements have gained traction throughout Europe, scholars and pundits have noted decreased public support for international governing institutions. In particular, courts like the European Court of Human Rights - which has the ability to hear complaints and issue decisions against states that are signatories to the European Convention on Human Rights regarding violations of the treaty - are often criticized for interfering too much in the affairs of sovereign states. However, it is difficult to differentiate two competing motives for public opposition to international courts: sovereignity motives (people objecting to the idea that international courts should have any jurisdiction over national courts irrespective of the decision) and substantive motives  (people objecting to the actual content of international courts' rulings).
+
+The authors of this study conducted a randomized survey experiment in the United Kingdom. Respondents were presented with a vignette that asked them to consider a case involving a hypothetical defendant (a foreign national convicted of a crime) who faces deportation. Respondents were randomly assigned to one of four treatment conditions that varied on two dimensions: whether the UK court ruled in favor of or against deportation and whether the European court agreed with or overruled the national court (`OverruledTreatment`). The final status of the foreigner (`DeportedTreatment`) - whether they were deported or would remain in the UK - was then stated to the respondent, reflecting either the UK court's decision if it was upheld or the European court's if it overruled the UK court.$\footnote{The specific vignette read (with the possible manipulations in brackets): Suppose that United Kingdom (UK) authorities decided to deport a foreigner who has been convicted of a crime. The foreigner appealed at a UK court that the decision to deport him violated his human rights. The UK court found that the authorities [CAN/CANNOT] deport the foreigner. The question was then brought before a European court, which [AGREED WITH/DISAGREED WITH] the UK court. The final decision is that the foreigner should [REMAIN IN THE UK/BE DEPORTED].}$
+
+The variables you will need are:
+
+- `OverruledTreatment` - Whether the European court in the vignette agreed with or ruled differently from the national court [Agreed = 0, Overruled = 1]
+
+- `DeportedTreatment` - Whether the foreigner in the vignette was deported or remained in the UK [Remained = 0, Deported = 1]
+
+- `D2Agree1` - Do you agree or disagree with the final decision? [Answers were originally on six point scale: Strongly support/ Agree / Slightly Agree / Slightly Disagree / Disagree / Strongly Disagree. They are recoded here to a binary: Agree = 1, Disagree = 0]
+
+- `Gender` - Gender [Male/Female]
+
+- `Age` - Age [18-88 years old]
+
+- `Education` - Level of education [9-level categorical variable]
+
+## Part A
+
+Provide an intuitive explanation for why an experiment would be necessary for this research question as opposed to an observational study. 
+
+An experiment would be necessary because respondents may differ their answers when they know they are being observed, this is a form of response bias as respondees may answer differently to sensative issues. 
+
+## Part B
+
+Generate three new indicator variables: One for whether the respondent is young (age $\leq 45$), one for whether the respondent is female and one for whether they did not complete any college education (ISCED 0 - ISCED  3). Check that the means for each of these three indicators are similar between the treatment and control groups for the `DeportedTreatment` treatment. Perform this same balance check for the treatment and control groups of the `OverruledTreatment` treatment. 
+
+```{r}
+library(tidyverse)
+library(estimatr)
+
+
+opinion$young <- as.integer(opinion$age <= 45)
+
+opinion$female <- as.integer(opinion$Gender == 'Female')
+
+opinion$No_college <- as.integer(opinion$Education == 
+                                   'ISCED 0:  Early childhood education (less than primary)' |
+                                   opinion$Education == "ISCED 1: Primary education" |
+                                   opinion$Education == 'ISCED 2: Lower secondary education' |
+                                   opinion$Education == 'ISCED 3: Upper secondary education')
+
+
+#ATE Deported Treatment
+D_average_treated <- mean(opinion$D2Agree1[opinion$DeportedTreatment == 1])
+
+D_average_control <- mean(opinion$D2Agree1[opinion$DeportedTreatment == 0])
+
+D_sate <- D_average_treated - D_average_control
+
+D_young_avg_treated <- mean(opinion$D2Agree1[opinion$young == TRUE &
+                                               opinion$DeportedTreatment == 1])
+
+D_young_avg_control <- mean(opinion$D2Agree1[opinion$young == TRUE &
+                                               opinion$DeportedTreatment == 0])
+
+D_young_ate <- D_young_avg_treated - D_young_avg_control
+
+D_young_ate
+
+D_female_avg_treated <- mean(opinion$D2Agree1[opinion$female == TRUE &
+                                                opinion$DeportedTreatment == 1])
+
+D_female_avg_control <- mean(opinion$D2Agree1[opinion$female == TRUE & 
+                                                opinion$DeportedTreatment == 0])
+
+D_female_ate <- D_female_avg_treated - D_female_avg_control
+
+D_female_ate
+
+D_NC_avg_treated <- mean(opinion$D2Agree1[opinion$No_college == TRUE & 
+                                            opinion$DeportedTreatment == 1])
+
+D_NC_avg_control <- mean(opinion$D2Agree1[opinion$No_college == TRUE & 
+                                            opinion$DeportedTreatment == 0])
+
+D_NC_ate <- D_NC_avg_treated - D_NC_avg_control
+
+D_NC_ate
+
+deported_ates <-c(D_sate,D_young_ate, D_female_ate, D_NC_ate)
+
+print(deported_ates)
+
+#ATE Overruled Treatment
+
+O_average_treated <- mean(opinion$D2Agree1[opinion$OverruledTreatment == 1])
+
+O_average_control <- mean(opinion$D2Agree1[opinion$OverruledTreatment == 0])
+
+O_sate <- O_average_treated - O_average_control
+
+O_young_avg_treated <- mean(opinion$D2Agree1[opinion$young == TRUE & 
+                                               opinion$OverruledTreatment == 1])
+
+O_young_avg_control <- mean(opinion$D2Agree1[opinion$young == TRUE & 
+                                               opinion$OverruledTreatment == 0])
+
+O_young_ate <- O_young_avg_treated - O_young_avg_control
+O_young_ate
+
+O_female_avg_treated <- mean(opinion$D2Agree1[opinion$female == TRUE & 
+                                                opinion$OverruledTreatment == 1])
+
+O_female_avg_control <- mean(opinion$D2Agree1[opinion$female == TRUE & 
+                                                opinion$OverruledTreatment == 0])
+
+O_female_ate <- O_female_avg_treated - O_female_avg_control
+
+O_female_ate
+
+O_NC_avg_treated <- mean(opinion$D2Agree1[opinion$No_college == TRUE & 
+                                            opinion$OverruledTreatment == 1])
+
+O_NC_avg_control <- mean(opinion$D2Agree1[opinion$No_college == TRUE & 
+                                            opinion$OverruledTreatment == 0])
+
+O_NC_ate <- O_NC_avg_treated - O_NC_avg_control
+O_NC_ate
+
+overruled_ates <-c(O_sate ,O_young_ate, O_female_ate, O_NC_ate)
+print(overruled_ates)
+
+```
+
+## Part C
+
+Using a difference-in-means estimator, estimate the average treatment effect of the `OverruledTreatment` treatment on respondents' agreement with the European court's decision (`D2Agree1`). Provide an estimate of the standard error. Are respondents more likely to agree with the European court when it disagrees with the national court? 
+```{r}
+O_average_treated <- mean(opinion$D2Agree1[opinion$OverruledTreatment == 1])
+
+O_average_control <- mean(opinion$D2Agree1[opinion$OverruledTreatment == 0])
+
+O_sate <- O_average_treated - O_average_control
+
+O_SE <- var(opinion$D2Agree1[opinion$OverruledTreatment == 1])/
+  length(opinion$D2Agree1[opinion$OverruledTreatment == 1]) +  var(opinion$D2Agree1[opinion$OverruledTreatment == 0])/
+  length(opinion$D2Agree1[opinion$OverruledTreatment == 0])
+
+print(sqrt(O_SE))
+
+```
+The respondents are less likely to agree with the national court with they dissagree with national court. OUr difference in mean estimator showed a negative treatment effect on the D2Agree1 score when comparing the difference in means for the Overruled treatment groups. The control group, when the court did not overrule had a larger affect on the agreement of the deportation
+
+## Part D
+Using a difference-in-means estimator, estimate the average treatment effect of the `OverruledTreatment` treatment on respondents' agreement with the European court's decision (`D2Agree1`) when `DeportedTreatment` is equal to $0$ and when `DeportedTreatment` is equal to $1$. Calculate the difference in these two treatment effect estimates and provide an estimate of the standard error for the difference in effects. 
+```{r}
+opinion_NotDeported <- subset(opinion, DeportedTreatment == 0)
+
+Not_average_treated <- mean(opinion_NotDeported$D2Agree1[opinion_NotDeported$OverruledTreatment == 1])
+Not_average_control <- mean(opinion_NotDeported$D2Agree1[opinion_NotDeported$OverruledTreatment == 0])
+
+ate_Notdeported <- O_average_treated - O_average_control
+
+var_ate_Notdeported <- var(opinion_NotDeported$D2Agree1[opinion_NotDeported$OverruledTreatment == 1])/
+  length(opinion_NotDeported$D2Agree1[opinion_NotDeported$OverruledTreatment == 1]) + var(opinion_NotDeported$D2Agree1[opinion_NotDeported$OverruledTreatment == 0])/
+  length(opinion_NotDeported$D2Agree1[opinion_NotDeported$OverruledTreatment == 0])
+
+opinion_Deported <- subset(opinion, DeportedTreatment == 1)
+
+Dep_average_treated <- mean(opinion_Deported$D2Agree1[opinion_Deported$OverruledTreatment == 1])
+
+Dep_average_control <- mean(opinion_Deported$D2Agree1[opinion_Deported$OverruledTreatment == 0])
+
+ate_deported <- Dep_average_treated - Dep_average_control
+
+var_ate_deported <- var(opinion_Deported$D2Agree1[opinion_Deported$OverruledTreatment == 1])/
+  length(opinion_Deported$D2Agree1[opinion_Deported$OverruledTreatment == 1]) + var(opinion_Deported$D2Agree1[opinion_Deported$OverruledTreatment == 0])/
+  length(opinion_Deported$D2Agree1[opinion_Deported$OverruledTreatment == 1])
+
+diff_opinion_Deported = ate_Notdeported - ate_deported
+
+Var_opinion_Deported = var_ate_Notdeported + var_ate_deported
+
+print(diff_opinion_Deported)
+
+print(sqrt(Var_opinion_Deported))
+```
+
+Does the average treatment effect of the European Court *disagreeing* with the national court change depending on whether the final outcome results in the deportation of the foreign national?\
+The treatment effect of the European Court disagreeing with the national court does not seem to change people' agreeableness when comparing the difference in means for the Deported estimates of the control and treatment groups. The combined SE is .088 for the two groups
+
+## Part E
+Use the indicator variables you created in part B to partition the data into $G=8$ strata based on each possible unique combination of the three indicators. Which stratum contains the most respondents? Which stratum contains the least?
+
+```{r}
+opinion = opinion %>%
+  mutate(stratum = case_when(
+  female == 1 & young == 0 & No_college == 0 ~ "female old college",
+  female == 1 & young == 1 & No_college == 0 ~ "female young college",
+  female == 1 & young == 1 & No_college == 1 ~ "female young no college",
+  female == 1 & young == 0 & No_college == 1 ~ "female old no college",
+  female == 0 & young == 1 & No_college == 1 ~ "male young no college",
+  female == 0 & young == 0 & No_college == 1 ~ "male old no college",
+  female == 0 & young == 0 & No_college == 0 ~ "male old college",
+  female == 0 & young == 1 & No_college == 0 ~ "male young college"))
+
+c("female old college:",sum(opinion$stratum == "female old college"),
+"female young college:",sum(opinion$stratum == "female young college"),
+"female young no college:", sum(opinion$stratum == "female young no college"),
+"female old no college:",sum(opinion$stratum == "female old no college"),
+"male young no college:",sum(opinion$stratum == "male young no college"),
+"male old no college:",sum(opinion$stratum == "male old no college"),
+"male old college:",sum(opinion$stratum == "male old college"),
+"male young college:",sum(opinion$stratum == "male young college"))
+
+```
+Max = The female old college stratum
+Min = The female old no college stratum
+## Part F
+
+Consider the post-stratification estimator:
+
+$$\hat{\tau_{s}} = \sum_{g=1}^G \frac{N_g}{N} \hat{\tau_g},$$
+where $N_g$ is the number of units in stratum $g$, $N$ is the number of total units and $\hat{\tau_g}$ is the within-stratum difference-in-means estimator, defined as:
+
+$$\hat{\tau_g}  = \frac{1}{N_{t,g}} \sum_{i:G_i = g} D_i Y_i - \frac{1}{N_{c,g}} \sum_{i:G_i = g} (1 - D_i) Y_i$$
+where $N_{t,g}$ is the number of treated units in stratum $g$, $N_{c,g}$ is the number of control units in stratum $g$ and $G_i$ is an indicator denoting unit $i$'s stratum membership.
+
+Use the post-stratification estimator to estimate the average treatment effect of the `OverruledTreatment` treatment on agreement with the European court (`D2Agree1`). Provide an estimate of the standard error. How do your results differ from those in Part C? 
+
+```{r}
+N = 771
+stratums <- c("female old college",
+"female young college",
+"female young no college",
+"female old no college",
+"male young no college",
+"male old no college",
+"male old college",
+"male young college")
+strata_sates <- rep(NA,length(stratums))
+
+for(i in 1:length(stratums)){
+  
+  O_average_treated <- mean(opinion$D2Agree1[opinion$OverruledTreatment == 1 & 
+                                               opinion$stratum == stratums[i]])
+  
+  O_average_control <- mean(opinion$D2Agree1[opinion$OverruledTreatment == 0 & 
+                                               opinion$stratum == stratums[i]])
+  
+  O_ate <-O_average_treated - O_average_control
+  
+  Combine_ate <- O_ate * sum(opinion$stratum == stratums[i])/
+    nrow(opinion)
+  
+  strata_sates[i] <- Combine_ate
+  
+}
+
+print(c("Combined Strata Ates:", sum(strata_sates)))
+
+strata_var <- rep(NA,length(stratums))
+
+for(i in 1:length(stratums)){
+  
+  var_tau_u <- var(opinion$D2Agree1[opinion$OverruledTreatment == 1 & 
+                                      opinion$stratum == stratums[i]])/
+    length(opinion$D2Agree1[opinion$OverruledTreatment == 1 & 
+                              opinion$stratum == stratums[i]]) +
+  var(opinion$D2Agree1[opinion$OverruledTreatment == 0 &
+                         opinion$stratum == stratums[i]])/
+    length(opinion$D2Agree1[opinion$OverruledTreatment == 0 &
+                              opinion$stratum == stratums[i]])
+  
+  Combine_var <- var_tau_u * (sum(opinion$stratum == stratums[i])/ (length(opinion$stratum)))^2
+  
+  strata_var[i] <- Combine_var
+}
+print(c("Combined Standard Error", 
+        sqrt(sum(strata_var))))
+
+```
+The standard error is much smaller for stratified example than it is for the standard erorr in part c for the average treatment effect on the opinion population. 
+
+# Problem 2
+Consider an experiment with $N$ units. Each unit $i$ in the sample belongs to one of $G$ mutually exclusive strata. $G_i = g$ denotes that the $i$th unit belongs to stratum $g$. $N_g$ denotes the size of stratum $g$ and $N_{t,g}$ denotes the number of treated units in that stratum. Suppose that treatment is assigned via block-randomization. Within each stratum, $N_{t,g}$ units are randomly selected to receive treatment and the remainder receive control. Suppose that the proportion of treated units in each stratum, $\frac{N_{t,g}}{N_g}$, varies depending on the stratum. After treatment is assigned, you record an outcome $Y_i$ for each unit in the sample. Assume consistency holds with respect to the potential outcomes: $$Y_i =D_i Y_i(1) + (1-D_i)Y_i(0)$$ 
+
+Let $w(G_i) = \mathbb{P}(D_i = 1 | G_i)$ denote the known (constant) probability that unit $i$ would receive treatment given its stratum membership $G_i$.
+
+Instead of using the stratified difference-in-means estimator, your colleague suggests an alternative that assigns a weight to each unit and takes two weighted averages.
+$$
+\hat{\tau}_w = \frac{1}{N}\sum_{i=1}^N \frac{D_i Y_i}{w(G_i)} - \frac{(1 - D_i) Y_i}{1 - w(G_i)}
+$$
+Show that $\hat{\tau}_w$ is unbiased for the sample average treatment effect $\tau$:
+
+$$
+\tau = \frac{1}{N}\sum_{i=1}^N Y_i(1) - Y_i(0) 
+$$
+
+$$
+E[\hat{\tau}_w] = E[\frac{1}{N}\sum_{i=1}^N \frac{D_i Y_i}{w(G_i)} - \frac{(1 - D_i) Y_i}{1 - w(G_i)}]
+$$
+The size of the sample is a constant, so we can move it past the $\frac{1}{N}$
+$$
+E[\hat{\tau}_w] = \frac{1}{N}E[\sum_{i=1}^N \frac{D_i Y_i}{w(G_i)} - \frac{(1 - D_i) Y_i}{1 - w(G_i)}]
+$$
+Because of the linearity of Expectants we can move the expectant past the summation because the expectation of the sum of all the individuals is the same as the summation of all the summed expected values. 
+
+$$
+E[\hat{\tau}_w] = \frac{1}{N}\sum_{i=1}^N E[\frac{D_i Y_i}{w(G_i)} - \frac{(1 - D_i) Y_i}{1 - w(G_i)}]
+$$
+$w(G_i)$ is a constant probability that a unit with $i$ stratum will receive treatment and can be pulled out of the expectation. Across stratums the treatment assignment varies, so we can not say that $D_i$ treatment assignment is not constant but it is known. Consistency allows the observed outcomes to subsitute the potential outcomes because they are the only observable potential outcome and because $Y_i(1)$ is a constant we can extract it from the expectation. 
+
+$$ E[\hat{\tau}_w] = \frac{1}{N}\sum_{i=1}^N \frac{E[D_i] Y_i(1)}{w(G_i)} - \frac{E[(1 - D_i)] Y_i(0)}{1 - w(G_i)}$$
+We are given that the weight of the Stratums is equal to the the probability of the treatment given the stratums so we can subsitute those out. We can move the expected value into the constant probability
+
+$$
+E[\hat{\tau}_w] = \frac{1}{N}\sum_{i=1}^N \frac{E[D_i] Y_i(1)}{P(D_1 = 1 | G_i)} - \frac{(1 - E[D_i]) Y_i(0)}{1 - P(D_1 = 1 | G_i)}
+$$
+The probability of a binary treatment is known. It is not constant acrss stratum but within stratum is. We can say that the expected value of the of the treatment is the probability of the treatment dependent on the stratum. 
+$$
+E[\hat{\tau}_w] = \frac{1}{N}\sum_{i=1}^N \frac{P(D_i | G_i) Y_i(1)}{P(D_1 = 1 | G_i)} - \frac{(1 - P(D_i | G_i)) Y_i(0)}{1 - P(D_1 = 1 | G_i)}
+$$
+Cancelation leaves us with the unbiased estimator of:
+$$
+E[\hat{\tau}_w] = \frac{1}{N}\sum_{i=1}^N Y_i(1) - Y_i(0)
+$$
+# Problem 3
+
+For this question you will need the `SierraLeone_data.dta` dataset (available on the course website) based on a field experiment conducted by [Casey et al 2012](https://academic.oup.com/qje/article-abstract/127/4/1755/1841616). You will re-analyze this experiment using Fisher's randomization inference.
+
+Aid organizations in developing countries spend billions of dollars every year promoting accountability, competence and inclusion of under-representated groups. Arguably the most popular strategy for these efforts has been community-driven development (CDD) programs. CDD projects are initatives that attempt to bolster local coordination and enhance political participation by providing financial grants for local public goods and small entrepise development.
+
+[Casey et al 2012](https://academic.oup.com/qje/article-abstract/127/4/1755/1841616) explore the effectiveness of a CDD program in post-conflict Sierra Leone. The researchers block-randomized treatment (access to the CDD program) at the village level. That is, within each block (here chiefdoms) consisting of $N_g$ villages, the researchers randomly assigned $N_{t,g}$ villages to receive treatment. Overall, $N_t = 116$ villages received the treatment out of a total of $N = 233$.
+
+The variables you will need are:
+
+- `communitybank` - Whether the village has a community bank by the end of the experiment
+
+- `treat_control` - The village's treatment status
+
+- `chief_2004census` - The census area (chiefdom) at which block randomization was conducted
+
+- `id_vill` - Unique village identifier
+
+### Part A
+Compute the the simple difference in means of the `communitybank` variable between units in treatment and units in control. 
+```{r}
+library(tidyverse)
+library(haven)
+library(estimatr)
+library(ggplot2)
+SL <- read_dta(file = "SierraLeone_data.dta")
+
+SL <- subset(SL, !is.na(SL$community_bank))
+
+DiM <- mean(SL$community_bank[SL$treat_control == 1]) - 
+  mean(SL$community_bank[SL$treat_control == 0])
+
+DiM
+
+```
+
+### Part B
+Suppose that instead of block-randomizing, the researchers conducted a completely randomized experiment with $N_t = 116$, $N = 233$. How many possible unique treatment assignment vectors are there for this design? Hint: Remember binomial coefficients -- How many ways are there to choose a subset of $k$ unordered elements from a total of $n$ elements? 
+```{r}
+choose(233,116)
+```
+### Part C
+Write the sharp null hypothesis of no effect.
+
+Under a sharp null the potential outcomes for each individual are equal, making the individual difference in effect zero. The average treatment effect under the sharp null means the effect is = 0 
+
+### Part D
+Approximate the randomization distribution of the difference-in-means given a completely randomized design using a simulation with 5000 draws. Make a histogram of your draws. Use this approximate randomization distribution to calculate a $p$-value for a two-sided test of the sharp null of no effect. 
+```{r}
+#using sample
+n = 233
+
+n_t = 116
+
+sims <- 5000 # Big number
+
+null_diff <- rep(NA, sims) # Placeholder to store results
+
+for (i in 1:sims){ # For each iteration
+  # I need to randomly sample
+  
+  SL$temp_control <- sample(SL$treat_control)
+  
+  avg_treated <- mean(SL$community_bank[SL$temp_control == 0])
+  
+  avg_control <- mean(SL$community_bank[SL$temp_control == 1])
+  
+  null_diff[i] <- avg_treated - avg_control
+}
+
+pdf("null_dist_1.pdf", width=7, height=5)
+
+hist(null_diff, main = "Random Null distribution", 
+     xlab = "Average treatment effect")
+
+
+p_value <- mean(abs(null_diff) > DiM) 
+
+print(p_value)
+
+```
+### Part E
+Calculate the block-stratified difference in means of the `communitybank` variable between units in treatment and units in control. That is, calculate the difference in means within each block and then average the means, weighting blocks by the number of villages within each block.
+
+```{r}
+
+stratums <- c("biriwa",
+              "safroko limba",
+              "sanda loko",
+              "bombali shebora",
+              "sanda tendaren",
+              "sella limba",
+              "gbendenbu ngowahun",
+              "gbanti kamaranka",
+              "makari gbanti",
+              "bum",
+              "imperi",
+              "jong",
+              "nongoba bullom",
+              "bothe town")
+
+strata_sates <- rep(NA,length(stratums))
+
+N <- length(SL$treat_control)
+
+for(i in 1:length(stratums)){
+  
+  average_treated <- mean(SL$community_bank[SL$treat_control == 1 & 
+                                               SL$chief_2004census == stratums[i]])
+  
+  average_control <- mean(SL$community_bank[SL$treat_control == 0 & 
+                                               SL$chief_2004census == stratums[i]])
+  ate <- average_treated - average_control
+  
+  Combine_ate <- ate * (length(SL$id_vill[SL$chief_2004census == stratums[i]])/
+                          nrow(SL))
+                                                
+  strata_sates[i] <- Combine_ate
+  
+}
+
+print(c("Combined Strata Ates:", sum(strata_sates)))
+
+```
+
+### Part F
+Assume $N_{t,g}$ is fixed for each block and that within each block, the researchers assigned treatment using complete randomization. Given this treatment assignment scheme, how many possible unique treatment assignment vectors are there? How does it compare with the number you obtained in Part B?
+
+```{r}
+#Solve for each choose at the chief level and then sum
+combos <- rep(NA,length(stratums))
+
+for (i in 1:length(stratums)){
+  
+  combos[i] <- choose(length(SL$id_vill[SL$chief_2004census == stratums[i]]), length(SL$id_vill[SL$chief_2004census == stratums[i] & 
+                                                                                                  SL$treat_control == 1]))
+}
+
+
+print(combos)
+sum(combos)
+```
+It is much smaller number of unique treatment assignments, and is much more manageable to handle in an experiment. 
+
+### Part G
+Approximate the randomization distribution of the block-stratified difference-in-means given the *block-randomized* design using a simulation with 5000 draws. Make a histogram of your draws. Use this approximate randomization distribution to calculate a $p$-value for a two-sided test of the sharp null of no effect. 
+```{r}
+Data <- SL
+
+stratums <- c("biriwa",
+              "safroko limba",
+              "sanda loko",
+              "bombali shebora",
+              "sanda tendaren",
+              "sella limba",
+              "gbendenbu ngowahun",
+              "gbanti kamaranka",
+              "makari gbanti",
+              "bum",
+              "imperi",
+              "jong",
+              "nongoba bullom",
+              "bothe town")
+
+null_diff[i] <- sum(strata_sates)
+
+sims <- 5000 # Big number
+
+null_diff <- rep(NA, sims) # Placeholder to store results
+
+for (i in 1:sims){ # For each iteration
+
+  Data$tempvec <- 0
+  for(c in 1:length(stratums)){
+    
+    Data$tempvec[Data$chief_2004census == stratums[c]] <-
+   sample(Data$treat_control[Data$chief_2004census == stratums[c]],
+          length(Data$treat_control[Data$chief_2004census == stratums[c]]))
+    
+  strata_sates <- rep(NA,length(stratums))}
+  
+  for(t in 1:length(stratums)){
+    average_treated <- mean(Data$community_bank[Data$tempvec == 1 & 
+                                                 Data$chief_2004census == stratums[t]])
+    
+    average_control <- mean(Data$community_bank[Data$tempvec == 0 & 
+                                                 Data$chief_2004census == stratums[t]])
+    ate <- average_treated - average_control
+    
+    Combine_ate <- ate * (length(Data$id_vill[Data$chief_2004census == stratums[t]])/
+                            nrow(Data))
+                                                  
+    strata_sates[t] <- Combine_ate}
+    
+null_diff[i] <- sum(strata_sates)
+
+}
+
+sum(is.na(null_diff))
+pdf("null_dist_block.pdf", width = 7, height = 5)
+hist(null_diff, main = "Sharp Null distribution", 
+     xlab = "Average treatment effect -- Complete Block randomization\nN=5000", 
+     xlim= c(-.2,.2))
+
+Block_p_value <- mean(abs(null_diff) > DiM) 
+
+print(Block_p_value)
+
+```
+
+
+### Part H
+Compare the two-sided test $p$-value in Part G with the $p$-value from Part D. What features of the two different randomization approaches might explain these differences?
+
+Part G: P-value = 0
+
+Part F: P-value = 0
+
+There are couple of features of these two randomization approaches that might explain the lack of differences. First 5,000 simulation is pretty small to observes any test statistics as extreme as our observed statistic. Also, we have a realativily large Difference in means for our observed statistic. We also introduce pretreatment covariates in the block random sample which will improve our Standard Error and reduce our spread of test statistics. 
+
+
