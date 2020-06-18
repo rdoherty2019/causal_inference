@@ -1,0 +1,446 @@
+---
+title: 'Lab 12: Data Visualization'
+author: "Sidak Yntiso sgy210@nyu.edu (Based on Coppock 2020)"
+date: "April 27, 2020"
+output:
+  beamer_presentation:
+  incremental: true
+---
+
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.pos = 'h')
+```
+
+# Overview
+
+Visualizing ATE estimates
+
+- simple, blocked and cluster designs
+
+Visualizing covariate adjustment
+
+- adjusted and unadjusted models, interactions 
+
+Visualizing additional design problems
+
+- noncompliance
+
+# Why does this matter?
+
+```{r, echo=FALSE, fig.cap="Which figure persuades you the most about a causal relationship", out.width = '100%',fig.align="center"}
+knitr::include_graphics("Xiong2020.png")
+
+```
+
+# Visualization influences interpretation and decision-making
+
+- Participants rated statements involving line graphs and scatter plots as the least causal ([Xiong et al 2020](https://arxiv.org/abs/1908.00215))
+
+ - Viewing bar graphs with points overlayed, participants judge values that fall within the bar as being more likely to be more representative of the data, despite being equidistant from the mean ([Newman & Scholl 2012](https://link.springer.com/article/10.3758/s13423-012-0247-5))
+ 
+- Participants are more easily persuaded by bar graphs when they have no strong attitudes and more easily persuaded by tables when they have strong attitudes against ([Pandey et al 2014](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=6876023))
+
+# The difference in means
+
+```{r two-arm-load-data, message=FALSE, warning=FALSE}
+rm(list = ls())
+library(tidyverse); library(estimatr)
+#load data
+dat <- read.csv("two_arm_simulated_data.csv")
+
+#estimate sample characteristics and store them
+summary_df <-
+  dat %>%
+  group_by(condition) %>%
+  do(tidy(lm_robust(Y ~ 1, data = .))) %>%
+  mutate(Y = estimate)
+```
+
+# Less Informative
+```{r two-arm-ate1, fig.show='hide'}
+bad <-
+  ggplot(summary_df, aes(condition, Y)) + #data
+  geom_col() + #bar chart
+  scale_y_continuous(breaks = #5 ticks on Y axis
+                       seq(0, 1, length.out = 5)) +
+  coord_cartesian(ylim = c(-0.1, 1.1)) + # Y axis
+  theme_bw() + #convert background white 
+  theme(axis.title.x = 
+          element_blank()) + #remove axis title
+  ylab("Outcome variable: count of some behavior")
+  
+```
+
+# More Informative
+```{r two-arm-ate2, fig.show='hide'}
+good <-
+  ggplot(summary_df, aes(condition, Y)) +
+  geom_point(data = dat, #adds data points as jitters 
+    position = position_jitter(width = 0.2, height = 0.1),
+    alpha = 0.2 #controls transperancy
+  ) +
+  geom_point(size = 2, color ="red") + #averages with
+  geom_errorbar(aes(ymin = conf.low,   #confidence
+                    ymax = conf.high), #intervals
+                width = 0,color="red") +
+  scale_y_continuous(breaks = seq(0, 1, length.out = 5)) +
+  coord_cartesian(ylim = c(-0.1, 1.1)) +
+  theme_bw() + 
+  theme(axis.title.x = element_blank()) +
+  ylab("Outcome variable: count of some behavior")
+
+```
+
+# Plot the two-armed ATE estimates
+```{r two-arm-plot, fig.height=6,fig.width=10, message=FALSE, warning=FALSE}
+library(gridExtra) #stack ggplot items
+grid.arrange(bad, good,nrow=1) 
+```
+
+
+# Post-stratification/Block Estimators
+
+```{r block-data, message=FALSE, warning=FALSE}
+#load data
+dat <- read_csv("blocked_simulated_data.csv")
+
+#label neighborhood variable
+dat <- dat %>%
+  mutate(neighborhood_lab = paste0("N/hood ", 
+                                   neighborhood))
+
+#summarize data by group/treatment
+summary_df <-
+  dat %>% group_by(condition, neighborhood_lab) %>%
+  do(tidy(lm_robust(Y ~ 1, data = .))) %>%
+  mutate(Y = estimate)
+```
+
+
+# Invites comparisons by pretreatment strata
+```{r block-fig1}
+bad <- #grouping by covariate
+  ggplot(dat, aes(neighborhood_lab, Y)) +
+  geom_point(position = 
+               position_jitter(width = .25, height = .25), 
+             alpha = 0.2, stroke = 0) +
+  facet_wrap( ~ condition) + #adds panels for treatments
+  geom_point(data = summary_df, size = 4) +
+  geom_errorbar(data = summary_df,
+                aes(ymin = conf.low, ymax = conf.high),
+                width = 0) +
+  theme_bw() +
+  theme(strip.background = element_blank(),
+        axis.title.x = element_blank()) +
+  ylab("Outcome variable: count of some behavior")
+```
+
+# Invites comparisons by treatment group
+```{r block-fig2}
+good <- #grouping by treatment group
+ggplot(dat, aes(condition, Y)) +
+  geom_point(position = 
+               position_jitter(width = .25, 
+                               height = .1), 
+             alpha = 0.2, stroke = 0) +
+  facet_wrap( ~ neighborhood_lab) + #adds panels for X
+  geom_point(data = summary_df, size = 4) +
+  geom_errorbar(data = summary_df,
+                aes(ymin = conf.low, ymax = conf.high),
+                width = 0) +
+  theme_bw() +
+  theme(strip.background = element_blank(),
+        axis.title.x = element_blank()) +
+  ylab("Outcome variable: count of some behavior")
+```
+
+
+# Plot the CATEs by covariate
+```{r block-plot1, fig.height=6,fig.width=10, message=FALSE, warning=FALSE}
+bad
+```
+
+# Plot the CATEs by treatment
+```{r block-plot2, fig.height=6,fig.width=10, message=FALSE, warning=FALSE}
+good
+```
+
+# Plotting the ATE: Version 1
+```{r}
+summary_bad <- dat %>% group_by(condition) %>%
+  do(tidy(lm_robust(Y ~ 1, data = .))) %>%
+  mutate(Y = estimate)
+#plotting data
+bad <-ggplot(dat, aes(condition, Y)) +
+  geom_point(position = position_jitter(
+    width = .25, height = .1), alpha = 0.1, stroke = 0) +
+  geom_point(data = summary_bad, size = 4) +
+  geom_errorbar(data = summary_bad,
+                aes(ymin = conf.low, ymax = conf.high),
+                width = 0) +theme_bw() +
+  theme(strip.background = element_blank(),
+        axis.title.x = element_blank(),
+        legend.position = "none") +
+  ylab("Outcome variable: count of some behavior")
+```
+
+# Version 2
+```{r}
+summary_good <- dat %>% group_by(condition) %>%
+  do(tidy(lm_robust(Y ~ 1, weights = 1/Z_cond_prob, 
+                    data = .))) %>%
+  mutate(Y = estimate)
+#plotting data
+good <- ggplot(dat, aes(condition, Y)) +
+  geom_point(aes(size = 1 / Z_cond_prob), #weights
+             position = 
+      position_jitter(width = .25, height = .25),
+      alpha = 0.1, stroke = 0) +
+  geom_point(data = summary_good, size = 4) +
+  geom_errorbar(data = summary_good,
+                aes(ymin = conf.low,ymax = conf.high),
+                width = 0) +theme_bw() +
+  theme(strip.background = element_blank(),
+        axis.title.x = element_blank(),
+        legend.position = "none") +
+  ylab("Outcome variable: count of some behavior")
+```
+
+# Plot the ATE
+```{r two-block1-plot, fig.height=6,fig.width=10, message=FALSE, warning=FALSE}
+library(gridExtra)
+grid.arrange(bad, good,nrow=1) 
+```
+
+# Cluster randomization
+```{r clust-load, message=FALSE, warning=FALSE}
+#load data
+dat <- read_csv("clustered_simulated_data.csv")
+
+#summarize data
+summary_df_bad <-
+  dat %>%
+  group_by(condition) %>%
+  do(tidy(lm_robust(Y ~ 1, data = .))) %>%
+  mutate(Y = estimate)
+
+#summarize data noting clustering
+summary_df_good <-
+  dat %>%
+  group_by(condition) %>%
+  do(tidy(lm_robust(Y ~ 1, clusters = class, 
+                    data = .))) %>%
+  mutate(Y = estimate)
+
+```
+
+
+# Preliminaries
+```{r}
+#aggregrate data to the class level
+class_level <-
+  dat %>% group_by(class, condition, n_per_class) %>%
+  summarise(Y = mean(Y))
+
+#equivalnece between the two data
+summary(lm_robust(Y ~ condition, weights = n_per_class, 
+                  data = class_level))$coefficients[2,c(1,3)]
+summary(lm_robust(Y ~ condition, clusters = class, 
+                  data = dat))$coefficients[2,c(1,3)]
+```
+
+# Incorrect standard errors
+```{r}
+bad <-
+  ggplot(summary_df_bad, aes(condition, Y)) +
+  geom_point() + #weighted means with no correction  
+  geom_errorbar(aes(ymin = conf.low, 
+                    ymax = conf.high), width = 0) +
+  geom_point(data = dat,
+             position = 
+               position_jitter(width = 0.2, height = 0.1), 
+             alpha = 0.2, stroke = 0) +
+  coord_cartesian(ylim = c(400, 1600)) +
+  theme_bw() +
+  theme(axis.title.x = element_blank(),
+        legend.position = "none") +
+  ylab("Outcome variable: Classroom Average SAT score")
+```
+
+# Correct standard errors
+
+```{r}
+good <- 
+ggplot(summary_df_good, aes(condition, Y)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = conf.low, 
+                    ymax = conf.high), width = 0) +
+  geom_point(data = class_level, #weighted means
+             aes(size = n_per_class), #cluster size
+             position = 
+               position_jitter(width = 0.2, 
+                               height = 0.1), 
+             alpha = 0.2, stroke = 0) +
+  coord_cartesian(ylim = c(400, 1600)) +
+  theme_bw() +
+  theme(axis.title.x = element_blank(),
+        legend.position = "none") +
+  ylab("Outcome variable: Classroom Average SAT score")
+```
+
+
+# Plot the ATE
+```{r cluster-plot, fig.height=6,fig.width=10, message=FALSE, warning=FALSE}
+grid.arrange(bad, good,nrow=1) 
+```
+
+# Covariate Adjustment
+
+```{r message=FALSE, warning=FALSE}
+dat <- read_csv("covariate_simulated_data.csv")
+
+# Z is treatment. X is the covariate
+# Residualize on X
+dat <- dat %>% mutate(X_c = X - mean(X))
+
+fit_1 <- lm(Y ~ X_c + X_c:Z, data = dat)
+fit_2 <- lm(Z ~ X_c + X_c:Z, data = dat)
+
+dat <- dat %>% mutate(Y_Adjusted = residuals(fit_1),
+                      Z_Adjusted = residuals(fit_2),
+                      Y_Unadjusted = Y,
+                      Z_Unadjusted = Z)
+```
+
+# Reshaping the data 
+```{r message=FALSE, warning=FALSE}
+gg_df <- dat %>%
+  #reshape data long using key (ID) take values: 
+  gather(key, value, Z_Unadjusted, Z_Adjusted, 
+         Y_Unadjusted, Y_Adjusted) %>% #creates 400 obs
+  #covert single column into multiple columns
+  separate(key, into = c("variable", "estimation")) %>%
+  #reshape back wide using variable and values
+  spread(key = variable, value) %>%
+  #convert the estimation label into factor 
+  mutate(estimation = 
+           factor(estimation, 
+                  levels = c("Unadjusted", "Adjusted")))
+```
+
+# Further preliminaries
+```{r}
+#summarize reshaped data by estimation strategy
+summary_df <- gg_df %>% group_by(estimation) %>%
+  do(tidy(lm_robust(Y ~ 1, data = .))) %>%
+  mutate(Y = estimate)
+
+
+blank_df <-data.frame(Z = 0,
+    estimation = c("Unadjusted", "Unadjusted", 
+                   "Adjusted", "Adjusted"),
+    Y = c(0, 10,-5, 5))
+```
+# Plotting 
+```{r}
+good <- 
+ggplot(gg_df, aes(Z, Y)) +
+  geom_point(alpha = 0.4, stroke = 0) +
+  geom_blank(data = blank_df) +
+  stat_smooth(method = "lm_robust", color = "grey", alpha = 0.5) +
+  scale_y_continuous(breaks = -6:12) +
+  theme_bw() +
+  theme(strip.background = element_blank()) +
+  ylab("Outcome variable (raw scale is 7-point Likert)") +
+  xlab("Randomly assigned treatment") +
+  #seperate panels for adjusted/unadjusted. Free means
+  #don't adjust either y-axis or x-axis 
+  facet_wrap(~estimation, scales = "free")  
+```
+
+# The plot
+```{r message=FALSE, warning=FALSE}
+good
+```
+
+# Interactions with continous covariates
+```{r message=FALSE, warning=FALSE}
+library(margins) #compute marginal effects
+library(ggrepel)
+#load data
+dat <- read_csv("interaction_simulated_data.csv")
+#interaction model
+fit <- lm_robust(Y ~ condition * X, data = dat)
+#estimate the marginal effects at different values
+gg_df <-
+  fit %>%
+  margins(at = list(X = seq(-2, 2, by = 0.25))) %>%
+  summary %>% #summarize regression object
+  as.data.frame() %>%  #convert to data.frame
+  filter(factor == "conditionTreatment")
+
+```
+
+# Model predictions masquerading as data
+```{r message=FALSE, warning=FALSE}
+bad <-
+  ggplot(gg_df, aes(X, AME)) +
+  geom_point() +
+  coord_cartesian(xlim = c(-2, 2), ylim = c(-5, 10)) +
+  geom_errorbar(aes(ymax = lower, ymin = upper), width = 0) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  xlab("Continuous pre-treatment covariate") +
+  ylab("Estimated CATE at each level of the covariate") +
+  theme_bw()
+```
+
+# Plotting data for correct figure
+```{r message=FALSE, warning=FALSE}
+#object to store predictions
+pred_df <- data.frame(X = c(1, 1),
+                      condition = c("Control", "Treatment"))
+pred_df$Y <- predict(fit, newdata = pred_df)
+
+label_df <- data.frame(
+  X = c(1,0.5),
+  Y = c(-3.5, 7),
+  condition = c("Control", "Treatment"),
+  label = c("Slope for control units",
+            "Slope for treated units")
+)
+
+lines_df <- bind_rows(pred_df, label_df)
+```
+
+# Plotting the CATEs
+```{r}
+good <-
+  ggplot(dat, aes(X, Y, shape = condition, 
+                  group = condition)) +
+  geom_point(alpha = 0.2, stroke = 0) +
+  stat_smooth(method = "lm_robust", 
+              fullrange = TRUE, color = "black") +
+  geom_line(data = lines_df) + 
+  geom_label(data = label_df, aes(label = label)) +
+  coord_cartesian(xlim = c(-2, 2), ylim = c(-5, 10)) +
+  scale_color_manual(values = c("#205C8A", "#C67800")) +
+  xlab("Continuous pre-treatment covariate") +
+  ylab("Outcome") +
+  theme_bw() +
+  theme(legend.position = "none")
+```
+
+# Plot the ATE
+```{r message=FALSE, warning=FALSE}
+grid.arrange(bad, good,nrow=1) 
+```
+
+# Visualization tips
+
+- Visual comparisons across randomization groups, not across pretreatment or posttreatment strata
+
+- Show the fitted statistical model (with uncertainty estimates) in data-space
+
+- Use visualize cues to reveal design features (blocking, clustering, etc)

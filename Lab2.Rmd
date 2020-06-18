@@ -1,0 +1,283 @@
+---
+title: "Lab2"
+output: html_document
+---
+  ```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# $\LaTeX$ 
+1. Math in Rmarkdown
++ In-line math is placed between dollar-sign brackets: $f_{ij} x_{i} \times y_{j}^2$
++ Greek symbols, binary relations and other symbols: $\alpha, \beta, \gamma, \chi, \pi, \neq, \geq, \leq, \sim, \implies,\in, \infty.$
++ Displayed math can be placed within slash + squared brackets e.g. 
+\[ 
+E[\bar{x}] = E[\frac{1}{n} \sum_{i=1}^{n} x_i] \\
+=\frac{1}{N} \sum_{i=1}^{n} E[x_i] \\
+=\frac{N \bar{x}}{N} \\
+= \bar{x} 
+\]
+
+2. Installation
++ Editor: to write input code (e.g. [TeXstudio](https://www.texstudio.org/)) + TeX: to transform the code into document (e.g. [MacTex](http://www.tug.org/mactex/))
++ Online: [Overleaf](https://www.overleaf.com/)
++ Guides: [Learn $\LaTeX$ in 30 minutes](https://www.overleaf.com/learn/latex/Learn_LaTeX_in_30_minutes)
+
+# Exercise 1
+This question is reproduced from Question 1.5.2 of Imai's QSS text. You will need to load the relevant packages
+
+```{r, echo=T, message=F}
+#Packages to install
+#install.packages("tidyverse")
+#install.packages("devtools")
+
+
+#Load packages and datasets
+
+#library(tidyverse)
+#library(devtools)
+ #install_github("kosukeimai/qss-package",
+  #              build_vignettes = TRUE)
+kenya <- read.csv("Kenya.csv")
+sweden <- read.csv("Sweden.csv")
+```
+
+
+
+The question asks us to compute the age-specific crude date rate:
+
+$ASDR[x,x+delta) = 
+\frac{\text{number of deaths for people of age[x,x+delta]}}
+{\text{number of person-years of people of age[x,x+delta]}},$
+
+where $x,x+delta$ represent an age-range e.g. [20,25) years.
+
+The datasets (called Kenya and Sweden) are structured as follows:
+
+|Variable|Description|
+|-------|------|
+|country |abbreviated country name|
+|period |period during which data are collected|
+|age |age group|
+|births |number of births (in thousands), i.e., the number of
+||children born to women of the age group|
+|deaths |number of deaths (in thousands)|
+|py.men |person-years for men (in thousands)|
+|py.women |person-years for women (in thousands)|
+
+## Part A
+For each dataset, add a column to each dataset that corresponds to total population (total_population$_{x,x+\delta}$ = py.men$_{x,x+\delta}$ + py.women$_{x,x+\delta}$). Create another column that corresponds to the age-specific population share (pop_prop$_{x,x+\delta}$ = total_population$_{x,x+\delta}$/sum(total_population$_{x,x+\delta}$)). When computing fractions, notice that the datasets contains two periods  for each country - 1950-1955 and 2005-2010.
+
+``` {r}
+head(kenya)
+kenya <- subset(kenya, period == "2005-2010")
+sweden <- subset(sweden, period == "2005-2010")
+head(kenya)
+?cbind
+kenya$totpop <- keyna$py.men + keyna$py.women
+sweden$totpop <- sweden$py.men + sweden$py.women
+head(sweden)
+kenya$propop <- kenya$totpop / sum(kenya$totpop)
+sweden$propop <- sweden$totpop / sum(sweden$totpop)
+
+
+
+```
+
+## Part B
+Write a function that computes the ASDR for each age group in Kenya and Sweden.
+```{r}
+ASDR <- function(dat) {
+  r <- dat$deaths/ dat$totpop
+  return(r)
+}
+```
+
+## Part C
+Use the ASDR function to compute the crude death rate for each country: CDR = $\sum_{x} ASDR[x,x+\delta) \times P[x,x+\delta)$ , where $P[x,x+\delta)$ is the proportion of the population in the age range $x  - x + \delta$. 
+```{r}
+CDR_K <- sum(ASDR(kenya) * kenya$propop)
+CDR_S <- sum(ASDR(sweden) * sweden$propop)
+c(CDR_K, CDR_S)
+```
+## Part D
+Imai notes the small difference in CDR between Kenya and Sweden, despite the 35 fold difference in GDP per capita. This is likely driven by differences in the underlying age distributions. To see how, conduct a counterfactual analysis where you use $ASDR[x,x+\delta)$ from Kenya and $P[x,x+\delta)$ from Sweden. Compute counterfactual CDR = $\sum_{x} ASDR_{Kenya}[x,x+\delta) \times P_{Sweden}[x,x+\delta)$ How does this counterfactual CDR compare with the original CDR of Kenya? Interpret the difference, if any. 
+``` {r}
+CF_CDR_K <- sum(ASDR(kenya) * sweden$propop)
+CF_CDR_S <- sum(ASDR(sweden) * kenya$propop)
+c(CF_CDR_K, CF_CDR_S)
+```
+
+# Exercise 2
+In this exercise, we use replication data from [Munger 2019](https://link.springer.com/article/10.1007/s11109-016-9373-5). This study explores the effects of social sanctioning on racist online harassment. The author randomly assigns Twitter users with a historty of racist behavior to receive messages from Twitter bots with different attributes - in-group/out-group (same race) and high (500-550)/low(0-10) number of followers.  Here, we focus on just two groups - the control group (N=51) and the group that received tweets from bots that were in-group AND with a high number of followers (N=48). 
+
+#Part A
+Load the twitter_experiment file (using read.csv("twitter.csv")). The dataset is structured as follows:
+
+|Variable|Description|
+|-------|------|
+|treat.f |Treatment variable|
+|racism.scores.post.1wk | Extent of racist harassment 1 week after treatment|
+
+#Part B
+Which of the potential outcomes are observable for each treatment group?
+
+#Part C
+Fill out the missing potential outcomes for each unit, assuming that the individual average treatment effect is $Y_i(1) - Y_i(0) = \tau_i \sim \mathcal{N}(0.2,0.2)$. What is the SATE? 
+
+#Part D
+Write a loop that repeatedly samples potential outcomes 5000 times. In each iteration of the loop first randomly assign half of the sample to treatment:
+
+```{r,eval=FALSE}
+treat = sample(c(rep(1, N / 2), rep(0, N / 2)), size = N, replace = FALSE)
+```
+Next, use the new treatment vector to compute the difference in means,$\sum_i^{n_1} Y_i(1)/n_1 - \sum_i^{N-n_1} Y_i(0)/(N-n_1)$, where N are the number of units and $n_1$ are the number of units under treatment 
+```{r,eval=FALSE}
+diff.means[i] <- mean(Y1[treat == 1]) - mean(Y0[treat == 0])
+```
+
+## Part E
+What is the mean of the difference in means estimates? What is the mean difference between the difference in mean estimates and the SATE? Where does this uncertainty come from?
+
+
+## Sidenote: Figures in R
+
+```{r, echo=T, message=F}
+#plot has arguments (x,y), color, plot type ("p" = points,"l" = lines, "h" = "histogram", etc)
+#overlay additional plots with ``lines''
+line1 <- runif(15,min=0,max=0.05)
+line2 <- runif(15,min=0,max=0.05)
+
+#adding line for line1 (in red), label figure
+plot(x = c(1:15),y = line1,
+     col="red",ylim=c(0,0.05),type="l",
+     xlab="Age",ylab = "ASDR")
+#adding line for line2 (in  blue)
+lines(x = c(1:15),line2,col="blue")
+#adding a legend to the bottom left
+legend("bottomleft",
+       legend = c("Kenya", "Kenya (Counterfactual)"),
+       col= c("red","blue"),
+       pch = c(2,2),
+       bty = "n")
+
+##you will probably want to use ggplot2
+#install.packages("ggplot2")
+dat <- data.frame(x = c(1:15),line1 = line1,line2=line2)
+
+library(ggplot2)
+#plotting lines
+ggplot(data=dat)+ #takes dataset
+  geom_line(aes(x = c(1:15),y = line1),col="red")+ #plots lines
+  geom_line(aes(x = c(1:15),y = line2),col="blue")
+
+#include normal confidence intervals
+#ggplot(data=dat)+
+#  geom_smooth(aes(x = c(1:15),y = line1),col="red",method = "loess")+
+#  geom_smooth(aes(x = c(1:15),y = line2),col="blue",method = "loess")
+
+```
+
+########################
+# SOLUTIONS
+#Exercise 1
+```{r, echo=T, message=F}
+#Load packages and datasets
+data(Kenya,package = "qss") #see list of all datasets
+data(Sweden,package = "qss") #see list of all datasets
+
+#make total population column
+Kenya$total_pop <- Kenya$py.men + Kenya$py.women
+Sweden$total_pop <- Sweden$py.men + Sweden$py.women
+
+#make population age proportions column
+Kenya$prop_total_pop <- Kenya$prop_total_pop <- NA
+Kenya$prop_total_pop[Kenya$period=="2005-2010"] <-
+  Kenya$total_pop[Kenya$period=="2005-2010"]/sum(Kenya$total_pop[Kenya$period=="2005-2010"])
+Sweden$prop_total_pop[Sweden$period=="2005-2010"] <-
+  Sweden$total_pop[Sweden$period=="2005-2010"]/sum(Sweden$total_pop[Sweden$period=="2005-2010"])
+
+CDR_Kenya <- sum(Kenya$deaths[Kenya$period=="2005-2010"])/(sum(Kenya$total_pop[Kenya$period=="2005-2010"]))
+CDR_Sweden <- sum(Sweden$deaths[Kenya$period=="2005-2010"])/(sum(Sweden$total_pop[Kenya$period=="2005-2010"]))
+
+#compute the age-specific crude date rate
+#ASDR[x,x+delta] = number of deaths for people of age[x,x+delta]/
+#number of person-years of people of age[x,x+delta]
+ASDR <- function(data = dat){
+  d_list <- list()
+  for (x in unique(data$age)){
+    d = subset(data,age==x& period=="2005-2010")
+    d_list <- c(d_list,d$deaths/(d$total_pop))
+  }
+  names(d_list) <- unique(data$age)
+  return(d_list)
+
+}
+CDR_Kenya_v2 <- sum(as.numeric(ASDR(data=Kenya))* Kenya$prop_total_pop,na.rm = T)
+CDR_Sweden_v2 <- sum(as.numeric(ASDR(data=Sweden))* Sweden$prop_total_pop,na.rm = T)
+
+CDR_Kenya_counterfactual <- sum(as.numeric(ASDR(data=Kenya))* Sweden$prop_total_pop,na.rm = T)
+#Interpretation: the ASDR is increasing in age and there are a higher share of older people in Sweden.
+#If Kenya's population had the same age distribution as Sweden's, Kenya's CDR would be 4X
+
+#population proportions
+plot(c(1:15),as.numeric(Kenya$prop_total_pop[Kenya$period=="2005-2010"]),col="red",ylim=c(0,0.25),type="l",
+     ylab="Population Share",xlab="Age")
+lines(c(1:15),as.numeric(Sweden$prop_total_pop[Sweden$period=="2005-2010"]),col="blue",type="l")
+legend(10,0.25, legend=c("Kenya", "Sweden"),
+       col=c("red", "blue"),lty=1:1, cex=0.8)
+
+#ASDR
+plot(c(1:15),as.numeric(ASDR(data=Kenya)),col="red",ylim=c(0,0.05),type="l",
+     ylab="ASDR",xlab="Age")
+lines(c(1:15),as.numeric(ASDR(data=Sweden)),col="blue")
+legend(2,0.05, legend=c("Kenya", "Sweden"),
+       col=c("red", "blue"),lty=1:1,cex=0.8)
+```
+
+```{r}
+#load data
+munger2019 <- read.csv("C:\\Users\\Sidak Yntiso\\Downloads\\munger2019.csv")
+
+#potential outcomes
+Y1 <- rep(NA,100)
+Y0 <- rep(NA,100)
+
+#consistency: E[Y_i(0)] = E[Y_i(0)|D_i=0] and E[Y_i(1)] = E[Y_i(1)|D_i=1]
+Y1[munger2019$treat.f==1]=
+  munger2019$racism.scores.post.1wk[munger2019$treat.f==1]
+Y0[munger2019$treat.f==0]=
+  munger2019$racism.scores.post.1wk[munger2019$treat.f==0]
+
+#number of treated and control units
+t <- nrow(munger2019[munger2019$treat.f==1,])
+c <- nrow(munger2019[munger2019$treat.f==0,])
+
+#ignorability: E[Y_i(0)] = E[Y_i(0)|D_i=1] and E[Y_i(1)] = E[Y_i(1)|D_i=0]
+Y0[munger2019$treat.f==1]=
+  munger2019$racism.scores.post.1wk[munger2019$treat.f==1]-
+  rnorm(t, mean = 0.2, sd = 0.2)
+Y1[munger2019$treat.f==0]=
+  munger2019$racism.scores.post.1wk[munger2019$treat.f==0]+
+  rnorm(c, mean = 0.2, sd = 0.2)
+
+tau <- Y1 - Y0 # individual treatment effect
+## true value of the sample average treatment effect
+SATE <- mean(tau)
+SATE
+
+
+#Generating the standard error of the SATE (simulation approach)
+sims <- 5000 # repeat 5000 times, we could do more
+diff.means <- rep(NA, sims) # container
+for (i in 1:sims) {
+  ## randomize the treatment by sampling of a vector of 0s and 1s
+  treat <- sample(c(rep(1, 50), rep(0, 50)), size = 100, replace = FALSE)
+  ## difference-in-means
+  diff.means[i] <- mean(Y1[treat == 1]) - mean(Y0[treat == 0])
+}
+## estimation error for SATE
+est.error <- diff.means - SATE
+summary(est.error)
+```

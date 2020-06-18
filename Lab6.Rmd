@@ -1,0 +1,266 @@
+---
+title: 'Lab 5: The Bootstrap Method'
+author: "Sidak Yntiso sgy210@nyu.edu (based on notes by C Samii)"
+date: "March 09, 2020"
+output:
+  pdf_document: default
+  word_document: default
+  html_document:
+    df_print: paged
+---
+
+#Review
+  - Suppose a random sample of size $N$ from a large population, $P$.
+- The distribution of statistics computed on the samples drawn from $\{X_1, ..., X_N\}$ approximates the distribution of statistics computed on samples from P
+- For $D_i=1$, weights are $\frac{1}{\hat{p_i}}$. $D_i=0$, weights are $\frac{1}{1-\hat{p_i}}$
+  - Virtually all empirical implementations are semiparametric in the sense that parametric propensity score estimation (using logit or probit) is combined with nonparametric treatment effect estimation (using weighting)
+- Even when correctly specified, IPW produces imprecise point estimates in finite datasets if large weights exist (truncate weights in certain circumstances)
+
+#Goals
+- Use the bootstrap method to estimate the standard error and confidence intervals of the IPTW difference in means    
+- Compare the sample, population and analytical distributions of the t-statistic
+- Compute the sample, and populations distributions of other statistics
+
+  
+#IPTW Example
+```{r}
+rm(list=ls())
+library(estimatr)
+
+####################################
+# Pscore example:
+####################################
+
+# Make population data
+rm(list=ls())
+set.seed(11)
+#agg pop is 10000
+N.pop <- 10000
+#number everyone
+index <- 1:N.pop
+#covirate that predicts treatment
+X <- .5*exp(rnorm(N.pop))
+
+#UNits of thes counterfactual under control
+Y0 <- rnorm(N.pop)
+#Unit under treatment
+
+Y1 <- -1 + Y0 + 2*X + rnorm(N.pop)
+#propensity score
+#weights
+e.X <- (1+exp(-X))^(-1)
+#binaomal
+D <- rbinom(N.pop, 1, e.X)
+#observed Ys
+Y <- D*Y1 + (1-D)*Y0
+#test statistic
+rho <- mean(Y1-Y0)
+
+plot(X, Y0, col="blue", pch=19, cex=.25, ylim=range(c(Y1,Y0)))
+points(X, Y1, col="red", pch=19, cex=.25)
+
+rho
+summary(lm_robust(Y~D))$coefficients[,1]
+summary(lm_robust(Y~D+X))$coefficients[,1]
+
+pop.data <- data.frame(index, Y, D, X)
+
+
+# Draw a sample:
+n.samp <- 500
+
+# One case example
+#sample from index
+samp.i <- sample(index, n.samp)
+#population data at those 500 rows
+samp.data <- pop.data[samp.i,]
+
+summary(lm_robust(Y~D, data=samp.data))$coefficients[,1]
+summary(lm_robust(Y~D+X, data=samp.data))$coefficients[,1]
+
+#regression
+e.hat.X <- predict(glm(D~X, data=samp.data, family="binomial"), type="response")
+#weights
+samp.data$w <- samp.data$D*(1/e.hat.X) +
+  (1-samp.data$D)*(1/(1-e.hat.X))
+#model
+fit.ipsw.s <- lm_robust(Y~D, weights=samp.data$w, data=samp.data)
+
+# Get bootstrap estimate
+n.boot <- 500
+#store ate
+ate.hat <- rep(NA, n.boot)
+t.out <- rep(NA, n.boot)
+
+for (i in 1:n.boot){
+  #sample from index 1-500 with replacement
+  boot.index <- sample(samp.data$index, n.samp, replace=T)
+  #units that match the sample vector, with the actual rows in data and give us the rows from the 500
+  boot.data <- samp.data[match(boot.index, samp.data$index),] 	
+  #propensity score
+  e.hat.boot <- predict(glm(D~X, data=boot.data, family="binomial"),type="response")
+  #weights
+  boot.data$w <- boot.data$D*(1/e.hat.boot) +
+    (1-boot.data$D)*(1/(1-e.hat.boot))
+  
+  fit.ipsw.b <- lm_robust(Y~D, weights=boot.data$w, data=boot.data) 
+  ate.hat[i] <- summary(fit.ipsw.b)$coefficients[2,1]
+  t.out[i] <- summary(fit.ipsw.b)$coefficients[2,3]
+}
+#distrubition of ates in sample
+hist(ate.hat, breaks=50)
+#ate from sample
+abline(v=coef(fit.ipsw.s)[2], col="blue")
+#population ate
+abline(v=rho, col="red")
+
+# Naive analytical asymptotic CI ignoring pscore estimation
+#CI from sample
+aaCI <- c(summary(fit.ipsw.s)$coefficient[2,1]-
+            qt(.975,fit.ipsw.s$df.residual)*summary(fit.ipsw.s)$coefficient[2,2], 
+          summary(fit.ipsw.s)$coefficient[2,1]+
+            qt(.975,fit.ipsw.s$df.residual)*summary(fit.ipsw.s)$coefficient[2,2])
+# Bootstrap-b CI
+#Ci from our bootstrap ATES
+bbCI <- quantile(ate.hat, c(0.025, .975))
+# Bootstrap-t CI
+#bootsrap error times t stats quantiles
+btCI <- summary(fit.ipsw.s)$coefficient[2,2]*quantile(t.out, c(0.025, .975))
+
+#Naive does not hold up in different estimators and will not always match
+
+coef(fit.ipsw.s)[2]
+aaCI
+bbCI
+btCI
+
+# Examine actual sampling distribution
+#redrawing sample from population
+
+n.iter <- 500
+ate.hat.s <- rep(NA, n.iter)
+t.out.s <- rep(NA, n.iter)
+
+for(j in 1:n.iter){
+  samp.i <- sample(index, n.samp)
+  samp.data <- pop.data[samp.i,]
+  
+  e.hat.X <- predict(glm(D~X, data=samp.data, 
+                         family="binomial"), 
+                     type="response")
+  
+  samp.data$w <- samp.data$D*(1/e.hat.X) +
+    (1-samp.data$D)*(1/(1-e.hat.X))
+  
+  fit.ipsw <- lm_robust(Y~D, weights=samp.data$w, data=samp.data)
+  ate.hat.s[j] <- summary(fit.ipsw)$coefficients[2,1]
+  t.out.s[j] <- summary(fit.ipsw)$coefficients[2,3]
+}
+
+# True coef mean
+mean(ate.hat.s)
+# Estimate
+coef(fit.ipsw.s)[2]
+
+# True sampling sd
+sd(ate.hat.s)
+# Estimates
+#  Naive analytical
+summary(fit.ipsw.s)$coefficient[2,2]
+#  bootstrap-b
+sd(ate.hat)
+
+# True t stat dist
+plot(density(t.out.s-mean(t.out.s)))
+# Estimates:
+#   Analytical
+points(	seq(-4,4,.01), 
+        dt(seq(-4,4,.01),df=fit.ipsw.s$df.residual), 
+        type="l", 
+        col="red")
+#  Bootstrap-t
+points(density(t.out-mean(t.out)), type="l",col="blue")
+
+```
+
+
+
+
+#Exercise 1
+Use the pop.data and samp.data for the following questions.
+
+## Part A
+What is the maximum value of X in the population data? What is the maximum in the sample data?
+```{r}
+pop_max <- max(pop.data)
+sam_max <- max(samp.data)
+print(c(pop_max,sam_max))
+```
+  
+## Part B
+Using the non-parametric bootstrap, compute the standard deviation of the maximum of X in the population data. 
+
+```{r}
+n.iter <- 500
+max.s <- rep(NA, n.iter)
+t.out.s <- rep(NA, n.iter)
+
+for(j in 1:n.iter){
+  samp.i <- sample(index, n.samp)
+  samp.data <- pop.data[samp.i,]
+
+  max.ipsw <- max(samp.data$Y)
+  max.s[j] <- max.ipsw
+}
+```
+
+## Part C
+Using the non-parametric bootstrap, compute the standard deviation of the maximum  of X in the sample data. Does the sample boot-strapped standard deviation approximate the population boot-strapped standard deviation?
+  
+\newpage
+
+#Exercise 2
+Consider a population of 1000 units. Individual potential outcomes depend on treatment assignment and two stratifiying variables A, B:
+  $$Y_i(1) = 102 + 3 a_i + 2 b_i + 6(a_i \times b_i)+ \nu_{i1}$$
+  $$Y_i(0) = 100 +  2 a_i + b_i -2(a_i \times b_i) + \nu_{i0}$$
+  Where A, B are independent uniform random variables with a minimum of 0.1 and maximum of 1, and $\nu_{i1}, \nu{i0}$ are independent normal random variables with an expectation of 0 and standard deviation 5. For each individual, $y_i$ is equal to $D_iY_i(1)+ (1-D_i)Y_i(0),$ where $D_i$ is a Bernoulli distributed random variable with $p = 0.5$. 
+
+```{r include=FALSE}
+#setting up data
+set.seed(11)
+A <- runif(1000,0.1,1)
+B <- runif(1000,0.1,1)
+
+#potential outcomes
+Y1 <- 102 + 3*A + 2*B + 6*(A*B)+ rnorm(1000,0,5)
+Y0 <- 100 + 2*A + 1*B -2*(A*B) + rnorm(1000,0,5)
+
+#propensity scores
+S <- -2 + 3*A - 3*(A-0.1) + 2*(A-0.3) - 2*(A-0.5) + 4*(A-0.7) + 1*B - 1*(B-0.1) + 2*(B-0.7) - 2*(B-0.9) + 3*(A-0.5)*(B-0.5) - 3*(A-0.7)*(B-0.7)
+#propesnsity is exponetiated
+prop.score <- exp(S)/(1+exp(S))
+
+#treatment assignment
+D <- rbinom(1000,1,prop.score) 
+Y <- D*Y1 + (1-D)*Y0
+
+#treatment assignment
+Y <- D*Y1 + (1-D)*Y0
+```
+
+## Part A
+Compute the true ATE weighted by the given propensity scores (`prop.score`). You can use `lm_robust`. 
+```{r}
+q3 <- lm_robust()
+```
+
+## Part B
+Compute the unweighted ATE.
+
+## Part C
+Compute the unweighted ATE conditioning on the observable covariates (A and B). Again, assume we do not know the propensity scores.
+
+## Part D
+Using the observable covariates, estimate propensity scores for each unit (you can use a logistic regression). Compute the ATE weighted by the estimated propensity scores. How do these point estimates compare to the point estimates from Parts B and C?
+  
+  
