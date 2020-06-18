@@ -1,0 +1,465 @@
+---
+title: "DS-UA 201: Midterm Exam"
+author: Richie Doherty
+output: pdf_document
+date: "March 8, 2020"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+# Instructions
+\begin{quote}\itshape
+
+You should submit your writeup (as a knitted .pdf along with the accompanying .rmd file) to the course website before 11:59pm
+EST on Thursday March 12th. Please upload your solutions as a .pdf file saved as \texttt{Yourlastname\_Yourfirstinitial\_midterm.pdf}.
+In addition, an electronic copy of your .Rmd file (saved as \texttt{Yourlastname\_Yourfirstinitial\_midterm.Rmd}) should accompany
+this submission.
+
+Late finals will not be accepted, \textbf{so start early and plan to finish early}.
+Remember that exams often take longer to finish than you might expect.
+
+This exam has \textbf{3} questions and is worth a total of \textbf{50 points}. Show your work in order to receive partial credit.
+Also, we will not accept un-compiled .rmd files.
+
+In general, you will receive points (partial credit is possible) when you demonstrate knowledge about the questions we have asked, you will not receive points when you demonstrate knowledge about questions we have not asked, and you will lose points when you make
+inaccurate statements (whether or not they relate to the question asked). Be careful, however, that you
+provide an answer to all parts of each question.
+
+You may use your notes, books, and internet resources to answer the questions below. However, you are
+to work on the exam by yourself. You are prohibited from corresponding with any human being
+regarding the exam (unless following the procedures below).
+
+Sidak and I will answer clarifying questions during the exam. We will not answer statistical
+or computational questions until after the exam is over. If you have a question, send email to both of
+us. If your question is a clarifying one, we will remove all identifying information from the
+email and reply on Piazza. Do not attempt to ask us questions in person (or by phone), and do not post
+on Piazza.
+\end{quote}
+
+\pagebreak
+
+# Problem 1 (20 points)
+
+Do international election monitors reduce the incidence of electoral fraud? [Hyde (2007)](https://www.aeaweb.org/articles?id=10.1257/000282803321946921) studies the 2003 presidential election in Armenia, an election that took place during a period where the incumbent ruling party headed by President Robert Kocharian had consolidated power and often behaved in ways that were considered undemocratic.
+
+The full citation for this paper is
+
+> Hyde, Susan D. "The observer effect in international politics: Evidence from a natural experiment." *World Politics* 60.1 (2007): 37-63.
+
+At the time of the election, OSCE/ODIHR election monitors reported widespread electoral irregularities that favored the incumbent party such as ballot-box stuffing (pp. 47). However, we do not necessarily know whether these irregularities would have been worse in the absence of monitors. Notably, not all polling stations were monitored -- the OSCE/ODIHR mission could only send observers to some of the polling stations in the country. Since in the context of this election only the incumbent party would have the capacity to carry out significant election fraud, Hyde examines whether the presence of election observers from the OSCE/ODIHR mission at polling stations in Armenia reduced the incumbent party's vote share at that polling station.
+
+For the purposes of this problem, you will be using the `armenia2003.dta` dataset
+
+The R code below will read in this data (which is stored in the STATA .dta format)
+```{r, echo=T, message=F}
+library(tidyverse)
+library(haven)
+
+### Hyde (2007) Armenia dataset
+armenia <- read_dta("armenia2003.dta")
+```
+
+This dataset consists of 1764 observations polling-station-level election results from the 2003 Armenia election made available by the Armenian Central Election Commission. The election took place over two rounds with an initial round having a large number of candidates and a second, run-off election, between Kocharian and the second-place vote-getter, Karen Demirchyan. We will focus on monitoring and voting in the first round.  The specific columns you will need are:
+
+- `kocharian` - Round 1 vote share for the incumbent (Kocharian)
+- `mon_voting` - Whether the polling station was monitored in round 1 of the election
+- `turnout` - Proportion of registered voters who voted in Round 1
+- `totalvoters` - Total number of registered voters recorded for the polling station
+- `total` - Total number of votes cast in Round 1
+- `urban` - Indicator for whether the polling place was in an urban area (0 = rural, 1 = urban)
+- `nearNagorno` - Indicator for whether the polling place is near the Nagorno-Karabakh region (0 = no, 1 = yes)
+
+### Question 1 (3 points)
+
+Hyde describes the study as a "natural experiment," stating: 
+
+> "I learned from conversations with staff and participants in the OSCE observation mission to Armenia that the method used to assign observers to polling stations was functionally equivalent to random assignment. This permits the use of natural experimental design. Although the OSCE/ODIHR mission did not assign observers using a random numbers table or its equivalent, the method would have been highly unlikely to produce a list of assigned polling stations that were systematically different from the polling stations that observers were not assigned to visit. Each team's assigned list was selected arbitrarily from a complete list of polling stations." (p. 48)
+
+What makes this study a "natural experiment" and not a true experiment? What assumption must the study defend in order to identify the causal effect of election monitoring that would be guaranteed to hold in a randomized experiment? What might be some possible reasons why that assumption might not hold in this design?
+
+What makes this study a "natural experiment' is two factors: the researcher, Hyde, does not control the probability of the treatment assignment, the presence of OSCE at the polling station, and Hyde does not know the probability of the treatment assignment used by the OSCE so he cannot recreate the experiment. 
+
+The assumption the study must defend in order to indentify the causal effect of election monitoring is that the assignment of observers to the polling stations was in fact randomly assigned and not related to the incumbent voting propotions' potential outcomes.  
+
+Some possible reasons why that assumption might not hold is, the assignment of observers may have assigned treatment to polling stations that may have been more ikely to received voting tampering from the incumbent. The observers might have also been assigned to polling stations that were easier to access or had more available OSEC observes, urban polling stations for example. 
+
+
+### Question 2 (3 points)
+
+For the purposes of this question, assume election monitors were assigned as the author describes - in a manner "functionally equivalent to random assignment." Using the difference-in-means estimator, estimate the average treatment effect of election monitoring on incumbent vote share in round 1. Provide a 95\% confidence interval and interpret your results. Can we reject the null of no average treatment effect at the $\alpha = 0.05$ level? 
+
+```{r}
+library(estimatr)
+treated <-mean(armenia$kocharian[armenia$mon_voting == 1])
+control <- mean(armenia$kocharian[armenia$mon_voting == 0])
+ate <- ( treated - control )
+t_var <- (var(armenia$kocharian[armenia$mon_voting == 0]) /  length(armenia$kocharian[armenia$mon_voting == 0]))
+c_var <- (var(armenia$kocharian[armenia$mon_voting == 1])/
+    length(armenia$kocharian[armenia$mon_voting == 1]))
+
+var_ate <- t_var + c_var
+  
+
+print(ate)
+print(sqrt(var_ate))
+
+CI <-  c(ate - (1.96 * sqrt(var_ate)), ate + (1.96 * sqrt(var_ate)))
+print(CI)
+
+#checking answer
+lm_robust(kocharian ~ mon_voting, data = armenia)
+```
+The average treatment effect of the election montoring on the proportion of voting share resulted in a .0587 decrease for the incumbent. The confidence interval ranges from (-.0779, -.0395) with a p-value =  0.01. Because our confidence interval does not contain zero, and our p- value is less that .05 we can reject the null hypothesis of no treatment effect of election monotiring on the incumbent voting proportion. 
+
+
+### Question 3 (5 points)
+
+Evaluate the author's identification assumptions by examining whether the treatment is balanced on three pre-treatment covariates: the total number of registered voters, whether a polling place was in an urban area, and whether the polling place was located near the Nagorno-Karabakh region (Kocharian's home region and a disputed territory between Armenia and Azerbaijan). Discuss your results. Are they consistent with the author's description of "as-if random" assignment?
+
+```{r}
+#proportion
+mean(armenia$totalvoters[armenia$mon_voting == 1])
+mean(armenia$totalvoters[armenia$mon_voting == 0])
+#Diff in means
+Total_T <- mean(armenia$totalvoters[armenia$mon_voting == 1])
+Total_C <- mean(armenia$totalvoters[armenia$mon_voting == 0])
+total_reg_voters <- ( Total_T - Total_C )
+print(total_reg_voters)
+#check answer
+lm_robust(totalvoters ~ mon_voting, data = armenia)
+#mean of all total voters for all polling stations
+mean(armenia$totalvoters)
+```
+It seems that there were a larger number of registered voters at the polling locations where there was a OSEC observer than there was for polling stations that did not have an OSEC monitor.
+
+```{r}
+urban_T <- mean(armenia$urban[armenia$mon_voting == 1])
+urban_C <- mean(armenia$urban[armenia$mon_voting == 0])
+urban <- (urban_T - urban_C)
+print(urban_T)
+print(urban_C)
+print(urban)
+lm_robust(urban ~ mon_voting, data = armenia)
+```
+It seems that there were a larger proportion of urban polling stations that were assigned OSEC observers for the treatment than there were for the control.
+
+```{r}
+Nag_T <- mean(armenia$nearNagorno[armenia$mon_voting == 1])
+Nag_C <- mean(armenia$nearNagorno[armenia$mon_voting == 0])
+nearNagorno <- (Nag_T - Nag_C)
+print(Nag_T)
+print(Nag_C)
+print(nearNagorno)
+lm_robust(nearNagorno ~ mon_voting , data = armenia)
+```
+It seems that there is a relative balance of monitor and unmonitored polling stations in the region near Nagorno, the incumbents home region. 
+
+Overall at first there seemed to be a relative inbalance in the total number of registered voters in the polling stations that had a OSEC representative. On average the difference was about 398 more registered voters in polling stations that had OSEC representative than those polling stations that did not. When combined with the knowledge that in the treatment group 61% of the polling stations resided in urban regions while only 50% of the control group resided in the control (a difference of 11%), there does seem to be evidence that is innconsistent with the author's description of 'as-if-random" assignment. There seems to be a partner in the inbalance of a higher proption of OSEC observers at polling regions with a larger number of registered voters and in urban regions.
+
+There does not seem to be an inbalance or inconsistency in the Nagorno subset. The region, which is the incumbents home town and a highly militarized state because it is a disputed region between Armenia and Azerbaijan, did not have a larger inbalance of treatment and control and seemed to be consistent with the author's claim of "as-if-random".
+
+### Question 4 (2 points)
+
+Suppose that a potential confounder was positively associated with the presence of election monitors and negatively associated with incumbent vote share. How would this affect the difference-in-means estimate of the average treatment effect? Would it under-estimate, over-estimate or correctly estimate the ATE?
+
+If the potential confounder is positively associated with the presence of election monitors (the treatment) and is negatively associated with incumbent vote share (the outcome) then the bias will be negative and will under-estimate the ATE
+
+### Question 5 (5 points)
+
+Divide the sample into five strata based on the total number of registered voters at each polling station (`totalvoters`): 
+
+|Stratum|Total Registered Voters|
+|-------|-----------------------|
+|Tiny| `totalvoters` < 430|
+|Small| 430 $\le$ `totalvoters` < 1192|
+|Medium| 1192 $\le$ `totalvoters` < 1628|
+|Large| 1628 $\le$ `totalvoters` < 1879|
+|Huge | 1879 $\le$ `totalvoters` |
+
+Estimate the average treatment effect of election monitoring in round 1 on incumbent vote share using a stratified difference-in-means estimator, stratifying on the total number of registered voters. Provide a 95\% confidence interval and interpret your results. Can we reject the null of no average treatment effect at the $\alpha = 0.05$ level? Compare your answer to your estimate from Question 2 and discuss any differences you see.
+```{r}
+armenia <- armenia %>% 
+  mutate(Tiny = case_when(totalvoters < 430 ~ 1,
+                          totalvoters >= 430 ~ 0),
+         Small = case_when((totalvoters >= 430) & (totalvoters < 1192) ~ 1,
+                           (totalvoters < 430)  ~ 0,
+                           (totalvoters >= 1192) ~ 0),
+                           Medium = case_when((totalvoters >= 1192) & (totalvoters < 1628) ~ 1,
+                           (totalvoters < 1192)~ 0,
+                           (totalvoters >= 1628) ~ 0),
+         Large = case_when((totalvoters >= 1628) & (totalvoters < 1879) ~ 1, 
+                           (totalvoters < 1628) ~ 0,
+                           (totalvoters >= 1879) ~ 0),
+         Huge = case_when(totalvoters >= 1879 ~ 1,
+         totalvoters < 1879 ~ 0))
+armenia = armenia %>% unite("strata", Tiny,Small,Medium, Large, Huge, remove = FALSE)
+table(armenia$strata)
+```
+
+```{r}
+#hold the results
+tau <- var <- list()
+
+
+for (i in sort(unique(armenia$strata))){
+  #estimator
+    tau[i] <- (mean(armenia$kocharian[armenia$mon_voting == 1&armenia$strata== i]) -
+                 mean(armenia$kocharian[armenia$mon_voting == 0&armenia$strata== i]))
+    #variance
+    var[i] <- (var(armenia$kocharian[armenia$mon_voting == 0&armenia$strata== i])/
+                 length(armenia$kocharian[armenia$mon_voting == 0&armenia$strata==i]) +
+                 var(armenia$kocharian[armenia$mon_voting == 1&armenia$strata== i])/
+        length(armenia$kocharian[armenia$mon_voting == 1&armenia$strata== i]))
+}
+#strata weighting
+weights <- table(armenia$strata)/length(armenia$strata)
+tau_strat = sum(unlist(tau)*weights)
+var_tau_strat= sum(unlist(var)*weights^2)
+
+results <- c(c("point estimate", "Standard Error"),c(tau_strat,sqrt(var_tau_strat)))
+CI <- c(tau_strat - (sqrt(var_tau_strat)*1.96), tau_strat + (sqrt(var_tau_strat)*1.96))
+print(results)
+print(CI)
+#Checking answer
+lm_lin(kocharian ~ mon_voting, covariates = ~ strata, data=armenia)
+```
+
+We cannot reject the null of no treatment effect because our confidence interval contains 0. 
+
+When comparing the point estimate result and the standard error of our strata estimator to our simple difference in means in question 2 we see a large difference in our point estimate (Strata = -.017, Simple = -.058) and a similar result for our standard error (Strata = .01, Simple = .01). We rejected the null of no treatment effect in question 2 with a 95% level but here in the strata estimator we failed to reject the null of no treatment effect. 
+
+### Question 6 (2 points)
+
+In Table 4 of the paper, Hyde uses an estimator for the average treatment effect of a polling place receiving election monitors in round 1 on the incumbent's vote share in round 1 *conditional* on the total number of votes cast in the election. Will this approach be unbiased for the average treatment effect of election monitors on the incumbent's vote share? Why or why not?
+
+No because the total number of votes cast in the election is post treatment assignment (OSEC observer). Conditioning on a post treatment variable introduces selection bias. It breaks the randomization of the treatment and requires addditional assumptions that were not guaranteed in the experiment at the time. 
+
+\pagebreak
+
+# Problem 2 (15 points)
+
+Sometimes when designing an experiment, it is impossible to completely randomize over the entire sample of respondents since respondents arrive in a sequence. For example, experimenters fielding online surveys do not observe the entire sample and sometimes have to randomly assign treatments in a "just-in-time" manner. One approach in this case is to simply flip a fair coin for each individual and assign to treatment or control based on whether that coin comes up heads or tails -- a sequence of Bernoulli trials. However, this may result in a sample that has too many treated units and too few control units (or vice-versa).
+
+Efron (1971) suggests an alternative approach that biases the coin depending on how many units have previously been assigned to the treatment group versus the control group.
+
+For this problem, you should use the `problem2.csv` dataset. It contains a simulated dataset with an outcome variable `Y` and a number assigned to each unit `order`. 
+
+```{r, echo=T, message=F}
+# Load in problem 2 dataset
+problem2 <- read_csv("problem2.csv")
+
+```
+
+You should also be familiar with the `rbinom()` function. The function `rbinom(n, 1, prob)` will generate `n` independent random bernoulli trials (binary 0/1 variable) each with success ($1$) probability of `prob`. For example, `rbinom(20, 1, .3)` will generate 20 independent bernoulli trials each with probability of $0.3$ of being equal to $1$.
+
+### Question 1 (5 points)
+
+Suppose treatment was assigned via independent Bernoulli trials with a constant probability of treatment $\mathbb{P}(D_i = 1) = .5$ for all units. Given the sharp null hypothesis of no individual treatment effect ($Y_i(1) = Y_i(0)$) simulate (using 10000 iterations) the randomization distribution of the difference-in-means test statistic. Based on your simulation, compute the variance of this randomization distribution.
+
+```{r}
+set.seed(48093)
+N <- 10000
+#empty list
+null_diff <- rep(NA, N)
+for (i in 1:N){
+  #assignning treatment
+  problem2$controlPermute <- rbinom(100,1,.5)
+  #estimator
+  ta_u <- (mean(problem2$Y[problem2$controlPermute == 1]) - 
+    mean(problem2$Y[problem2$controlPermute == 0]))
+  null_diff[i] <- ta_u
+}
+var_dist <- var(null_diff)
+print(mean(null_diff))
+print(var_dist)
+print(sqrt(var_dist))
+```
+The variance of my simple coin flip estimator is .0356.
+### Question 2 (5 points)
+
+Consider instead the randomization scheme where treatment is assigned sequentially for units $1$ through $100$. In other words, treatment for unit 1 is randomly assigned. Then treatment for unit 2 is randomly assigned depending on the value of the treatment for unit 1, and so on... Let $\tilde{N_{t,i}}$ denote the number units treated prior to unit $i$, $\tilde{N_{c,i}}$ the number of units under control prior to unit $i$ and $\tilde{Z}_i = \tilde{N_{t,i}} - \tilde{N_{c,i}}$ or the difference in the number of treated and control groups. By definition, $\tilde{Z}_1 = 0$ since there are no treated or control units when the first unit is assigned.
+
+Define the probability of treatment $\mathbb{P}(D_i = 1)$ for the $i$th unit as
+
+$$
+\mathbb{P}(D_i = 1) =
+\begin{cases}
+\pi &\text{ if } \tilde{Z}_i < 0\\
+0.5 &\text{ if } \tilde{Z}_i = 0\\
+(1- \pi) &\text{ if } \tilde{Z}_i > 0\\
+\end{cases}
+$$
+
+Intuitively, the assignment mechanism biases the probability of receiving treatment upward if there are fewer treated than control and biases it downward if there are more treated than control at the time of assignment.
+
+Let $\pi = .9$. Given the sharp null hypothesis of no individual treatment effect ($Y_i(1) = Y_i(0)$) simulate the randomization distribution of the difference-in-means test statistic under this new treatment assignment mechanism. Based on your simulation, compute the variance of the randomization distribution. How does it compare to your result from Question 1?
+
+```{r}
+set.seed(10002)
+N <- 10000
+#empty list
+bias_null_diff <- rep(NA, N)
+for (i in 1:N){
+  #blank treatment column
+  problem2$bias_controlPermute <- rep(NA, 100)
+  for (c in 1:100){
+    #criteria for treatment probability
+    z <- (sum(problem2$bias_controlPermute == 1, na.rm = TRUE) - 
+            sum(problem2$bias_controlPermute == 0, na.rm = TRUE))
+    if (z < 0){
+      p <- .9} 
+    else if (z == 0){
+      p <- .5}
+    else if (z > 0){
+      p <- 1 -.9}
+    #assigning treatment 1 at a time by order
+    problem2$bias_controlPermute[problem2$order == c] <- rbinom(1,1,p)
+  }
+  #estimator
+  bias_tau <- (mean(problem2$Y[problem2$bias_controlPermute == 1]) -
+                 mean(problem2$Y[problem2$bias_controlPermute == 0]))
+  bias_null_diff[i] <- bias_tau
+}
+var_bias_dist <- var(bias_null_diff)
+print(mean(bias_null_diff))
+print(var_bias_dist)
+print(sqrt(var_bias_dist))
+```
+The variance of the simple coin flip randomization in question 1 is 0.0356339 and the biased randomization method created a variance of 0.0323884. There is a small difference in the variance (The biased randomization having a smaller variance) but not a noticeable difference. 
+
+### Question 3 (5 points)
+
+Intuitively, what will happen to this randomization process if $\pi$ is set to be less than $.5$? What would happen to the variance of the randomization distribution? (You don't need to use a simulation to answer this, but you are welcome to use one if it would help).
+
+If $\pi$ was set to less than .5 than the variance of the randomized distribution will increase and be larger than the simple coin flip randomization. The randomization process under a less .5 $\pi$ would not correct properly for an inbalanced in the number of control and treated units. It would bias more towards the control or the treated. As more units are assigned two things could happen:
+
+if z becomes negative (There are more control units than treated units) the probability of being assigned to the treated group will change from .5 to less than .5 , making it less likely for more units to be placed into treated. This bias will compound as the treatment assignment continues and we will end with a sample that has more control units than treated units. 
+
+if z becomes positive (There are more treated units than control units) the probbility of being assigned to the treated group will change from .5 to greated than .5 , making it more likely for units to be placed into treated. This bias will compound as the treatment assignment continues and we will end with an unbalanced number of treatment and control units.
+
+If we simulate experiments many times this will lead to variablity in our distribution. 
+
+```{r}
+set.seed(10003)
+N <- 10000
+bias_null_diff <- rep(NA, N)
+for (i in 1:N){
+  problem2$bias_controlPermute <- rep(NA, 100)
+  for (c in 1:100){
+    z <- (sum(problem2$bias_controlPermute == 1, na.rm = TRUE) - 
+            sum(problem2$bias_controlPermute == 0, na.rm = TRUE))
+    if (z < 0){
+      p <- .3} 
+    else if (z == 0){
+      p <- .5}
+    else if (z > 0){
+      p <- 1 -.3}
+    problem2$bias_controlPermute[problem2$order == c] <- rbinom(1,1,p)
+  }
+  bias_tau <- (mean(problem2$Y[problem2$bias_controlPermute == 1]) -
+                 mean(problem2$Y[problem2$bias_controlPermute == 0]))
+  bias_null_diff[i] <- bias_tau
+}
+var_bias_dist <- var(bias_null_diff)
+print(mean(bias_null_diff))
+print(var_bias_dist)
+print(sqrt(var_bias_dist))
+```
+
+\pagebreak
+
+# Problem 3 (15 points)
+
+Consider again our dataset from Study 1 of ``Incentives to Exercise" 
+
+> Charness, Gary, and Uri Gneezy. "Incentives to exercise." *Econometrica* 77.3 (2009): 909-931.
+
+Recall again that in this study, participants were randomly assigned to one of three treatment conditions. A control group that received no incentives, a group that was paid \$25 to attend the gym once in a week, and a group that was given both the \$25 incentive and an additional \$100 if they attended the gym eight times in the following four weeks. Subsequent gym attendance from Week 6 to Week 12 (after the incentives had run out) was observed.
+
+```{r, echo=T, message=F}
+library(tidyverse)
+library(haven)
+
+# Load in exercise dataset
+exercise <- read_csv("exercise.csv")
+```
+
+The variables of interest are:
+
+- `Control` - 1 if the individual was in the control (no incentives) condition, 0 if otherwise
+- `High` - 1 if the individual was in the high-intensity incentives treatment (where people were paid \$100 to exercise 8 times), 0 if otherwise
+- `Before` - Average weekly gym attendance in the 8 weeks prior to the study
+- `After` - Average weekly gym attendance in the 7 weeks after the incentives were completed (Weeks 6-12).
+
+### Question 1 (2 points)
+
+Using the difference-in-means estimator, estimate the average treatment effect of the high-intensity incentives treatment (`High == 1`) relative to the no-incentives control group (`Control == 1`) on average weekly gym attendance in weeks 6-12. Provide an asymptotic 95\% confidence interval and interpret your findings.
+
+```{r}
+high_ate <- (mean(exercise$After[exercise$High == 1]) - 
+               mean(exercise$After[exercise$Control == 1]))
+high_var <- (var(exercise$After[exercise$High == 1]) / 
+               length(exercise$After[exercise$High == 1]) +
+               var(exercise$After[exercise$Control == 1]) /
+               length(exercise$After[exercise$Control == 1]))
+
+CI <- c(high_ate - (1.96 * sqrt(high_var)), high_ate + (1.96 * sqrt(high_var)))
+print(high_ate)
+print(high_var)
+print(CI)
+```
+We can reject the null of no incentive effect with a 95% confidence level. There is evidence to support the claim that a high incentive amount does have a lasting effect on the number of times participants will go to the gym in the post incentive period. 
+
+### Question 2 (5 points)
+
+Suppose that another researcher questioned the need to even do an experiment since we could just look at the change in average weekly gym attendance after the study (`After`) relative to average weekly gym attendance before the study (`Before`) for each individual assigned to the high-incentives condition. What assumptions do we need to make in order for this approach to identify the average treatment effect? Why might these assumptions be violated?
+
+In this example we would be conducting a cross over experiment. The main assumption in a cross over experiment is time. We would need to assume that the members of the high incentive condition only changed their gym behavior because of the treatment, during the time between pretreatment to treatment and post treatment. This assumption might be violated if their are unobserved or observed confounders that are affecting both the treatment assignment and the potential outcome.
+
+We would also need to assume that the partcipant's pretreatment status is the same or similar to the that same particpants post treatment status if ther were not given the high incentive treatment (Their other potential outcome or couterfactual if not receiving treatment). This may be violated because of the fundament problem of causal inference because we can't observe the same person at the same time, and people may change their work out habits over time. 
+
+### Question 3 (3 points)
+
+Estimate the average change in mean weekly gym attendance from the pre-treatment period (`Before`) to the post-treatment period (`After`) for individuals in the high-incentives condition. Provide an asymptotic 95\% confidence interval and interpret your findings. Compare this estimate to your result from Question 1.
+```{r}
+pre_v_post <- mean(exercise$After[exercise$High == 1]) - mean(exercise$Before[exercise$High == 1])
+var_pre_v_post <- var(exercise$After[exercise$High == 1]) / 
+  length(exercise$After[exercise$High == 1]) +
+  var(exercise$Before[exercise$High == 1]) / 
+  length(exercise$Before[exercise$High == 1])
+CI_pre_v_post <- c(pre_v_post - (1.96 * sqrt(var_pre_v_post)), pre_v_post + (1.96 * sqrt(var_pre_v_post)))
+print(pre_v_post)
+print(var_pre_v_post)
+print(CI_pre_v_post)
+```
+We would reject the null of no lasting effects of high incentive treatment with a 95% confidence level. 
+Comparing our results to question 1, the point estimates only slightly vary from .6786 in Q1 to .6397 in Q3. Q1 does have a higher variance of .0635 than Q3 at .0511. This is expected since the pretreatment status of the same group is better at explaining the variance in the outcome of that group.
+
+### Question 4 (5 points)
+
+Estimate the average change in mean weekly gym attendance from the pre-treatment period (`Before`) to the post-treatment period (`After`) for individuals in the control condition. Provide an asymptotic 95\% confidence interval and interpret your findings. What do your results tell you about the reasonability of your friend's suggested method for estimating the average treatment effect? Why might we still want to use a randomized experiment with a control group even when we happen to observe pre-treatment outcomes for units?
+
+```{r}
+c_after <- mean(exercise$After[exercise$Control == 1])
+c_before <- mean(exercise$Before[exercise$Control == 1])
+control_pre_v_post <-  c_after - c_before 
+
+var_after<- var(exercise$After[exercise$Control == 1]) / 
+  length(exercise$After[exercise$Control == 1])
+var_before <- var(exercise$Before[exercise$Control == 1]) / 
+  length(exercise$Before[exercise$Control == 1])
+var_control <-  var_after + var_before
+  
+CI_control <- c(control_pre_v_post - (1.96 * sqrt(var_control)), control_pre_v_post + (1.96 * sqrt(var_control)))
+print(control_pre_v_post)
+print(var_control)
+print(CI_control)
+```
+We would fail to reject the null of no lasting effects of being placed in the control group on the number of post workouts because our confidence interval contains 0. 
+
+Randomization allows us to make inferences about the probability of what we observed in our data is likely to happen because of random chance. If we just look at the difference in the pre and post treatment we will not know how likely or certain thar our sample effect is to the population effect. 
+
+Using a control group that had random assignment allows us to compare potential outcomes and use a difference in mean estimator. If you just compare post and pre treatment you will need to get further assumptions to use ignorability to observe what the participants may have looked like if they did not receive the treatment.

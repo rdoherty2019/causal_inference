@@ -1,0 +1,417 @@
+---
+title: "DS-UA 201: Final Exam"
+author: Professor Anton Strezhnev
+output: pdf_document
+date: "May 8, 2020"
+---
+
+```{r setup, include=FALSE}
+#install.packages("knitr")
+knitr::opts_chunk$set(echo = TRUE)
+
+options(digits = 4)
+```
+
+# Instructions
+\begin{quote}\itshape
+
+You should submit your writeup (as a knitted .pdf along with the accompanying .rmd file) to the course website before 2:00pm
+EST on Tuesday, May 19th. Please upload your solutions as a .pdf file saved as \texttt{Yourlastname\_Yourfirstinitial\_final.pdf}.
+In addition, an electronic copy of your .Rmd file (saved as \texttt{Yourlastname\_Yourfirstinitial\_final.Rmd}) should accompany
+this submission.
+
+Late finals will not be accepted, \textbf{so start early and plan to finish early}.
+Remember that exams often take longer to finish than you might expect.
+
+This exam has \textbf{3} questions and is worth a total of \textbf{50 points}. Show your work in order to receive partial credit.
+Also, we will not accept un-compiled .rmd files.
+
+In general, you will receive points (partial credit is possible) when you demonstrate knowledge about the questions we have asked, you will not receive points when you demonstrate knowledge about questions we have not asked, and you will lose points when you make
+inaccurate statements (whether or not they relate to the question asked). Be careful, however, that you
+provide an answer to all parts of each question.
+
+You may use your notes, books, and internet resources to answer the questions below. However, you are
+to work on the exam by yourself. You are prohibited from corresponding with any human being
+regarding the exam (unless following the procedures below).
+
+Sidak and I will answer clarifying questions during the exam. We will not answer statistical
+or computational questions until after the exam is over. If you have a question, send email to both of us
+us. If your question is a clarifying one, we will remove all identifying information from the
+email and reply on Piazza. Do not attempt to ask us questions in person (or by phone), and do not post
+on Piazza.
+\end{quote}
+
+\pagebreak
+
+# Problem 1 (15 points)
+
+What are the effects of education? This problem is confounded by the fact that college attendance is non-random and factors that predict college attendance also might predict outcomes of interest (like future income). One approach to addressing this might be through an instrumental variables strategy. In particular, a number of studies leverage distance to a nearby college as an instrument for educational attainment, arguing that high school students who grow up near a college are more likely to attend college. 
+
+In this problem, you will examine whether this is a valid instrument by analyzing a survey of approximately $4739$ high school seniors that was conducted in 1980 with a follow-up survey taken in 1986. Note that we are not going to analyze any *outcome* data (so you won't be estimating any IV effects here). Rather, we are going to assess (among other things) whether the instrument is plausibly exogenous and satisfies the assumptions of an IV design.
+
+This dataset is based on a dataset from  
+
+> Rouse, Cecilia Elena. "Democratization or diversion? The effect of community colleges on educational attainment." Journal of Business & Economic Statistics 13, no. 2 (1995): 217-224.
+
+and can also be found in the `AER` R package.
+
+The primary variables of interest are:
+
+- `distance` distance from 4-year college (in 10s of miles).
+- `education` number of years of education.
+
+The other covariates of interest are:
+
+- `gender` factor indicating gender.
+- `ethnicity` factor indicating ethnicity (African-American, Hispanic or other).
+- `score` base year composite test score. These are achievement tests given to high school seniors in the sample.
+- `fcollege` factor. Is the father a college graduate?
+- `mcollege` factor. Is the mother a college graduate?
+- `home` factor. Does the family own their home?
+- `tuition` average state 4-year college tuition (in 1000 USD).
+- `income` factor. Is the family income above USD 25,000 per year?
+- `region` factor indicating region (West or other).
+- `urban` Is the high school in an urban area?
+- `unemp` county unemployment rate in 1980.
+- `wage` state hourly wage in manufacturing in 1980.
+
+Below is the code to import the dataset into R
+```{r, echo=T, message=F}
+#install.packages("estimatr")
+library(tidyverse)
+library(haven)
+library(estimatr)
+
+### Load in the College Distance dataset
+college <- read_csv("CollegeDistance.csv")
+```
+
+### Question 1 (3 points)
+
+Assuming that distance-to-college is completely exogenous, estimate the first-stage average effect of distance from a 4-year college on the number of years of education eventually attained by a student (assume linearity in the effect of distance on education). Provide a 95\% confidence interval and interpret your results. Is distance a strong instrument for educational attainment?
+
+```{r}
+lm_robust(education ~  distance, data = college)
+```
+The First stage estimate of the instrument, distance, on the treated, education, found a -.07  effect. with a confidence interval that spans from -.09, -.05. We would reject the null of no effect of distance on eduction treatment with a 95% confidence level. 
+
+### Question 2 (2 points)
+
+Suppose we coarsen the treatment of interest to whether students completed a 4-year college degree (have 16 or more years of education) and the instrument to whether students grew up less than 20 miles from a 4-year college (`distance < 2`). Still assuming exogeneity of distance, estimate the first-stage effect of growing up less than 20 miles from a 4-year college on completion of at least a 4-year college degree. Provide a 95\% confidence interval and interpret your results. Explain in words what the montonicity/``no defiers" assumption would mean for this application.
+
+```{r}
+college_close_four <- subset(college, (distance < 2) & (education >=16))
+lm_robust(education ~ distance, data = college_close_four)
+```
+The First stage estimate of the instrument, distance, on the treated, education, found a .04 effect. with a confidence interval that spans from -.11, .03. We would fail  reject the null of no effect of distance on eduction treatment. 
+
+The montonicity assumption would mean that the education, the treatment, does not affect the assignment, distance. For this application we would have to assume that the level of education effects the distance on where people live to a school. 
+
+### Question 3 (5 points)
+
+Using the same treatment and instrument from Question 2, describe the average values of the covariates `income`, `score`, `fcollege` and `mcollege` among compliers using Abadie's kappa-weighting. Compare them to the covariate means for the sample as a whole. Do compliers noticeably differ on these covariates from the overall sample of students?
+
+```{r}
+pZ_i <- mean(college_close_four$distance)
+
+college_close_four['high_income'] <- college_close_four$income == "high"
+college_close_four["low_income"] <- college_close_four$income == "low"
+college_close_four$kappa <- 1 - ( college_close_four$education * ( 1 - college_close_four$distance ) ) / ( 1 - pZ_i ) - ( ( 1 -  college_close_four$education) * (college_close_four$distance ) ) / ( pZ_i )
+
+
+mean(college_close_four$high_income)
+## Complier High Income
+mean(college_close_four$high_income * college_close_four$kappa)/
+  mean(college_close_four$kappa)
+
+mean(college_close_four$low_income)
+## Complier Low Income
+mean(college_close_four$low_income * college_close_four$kappa)/
+  mean(college_close_four$kappa)
+
+```
+Yes the compliers differ on income status, as it appears the compliers, who lives within 20 miles of the 4 year institute are majority low income. 
+
+
+```{r}
+
+college_close_four['father_college'] <- college_close_four$fcollege == "yes"
+college_close_four["nofather_college"] <- college_close_four$fcollege == "no"
+
+mean(college_close_four$father_college)
+## Complier FreeCollege
+mean(college_close_four$father_college*college_close_four$kappa)/
+  mean(college_close_four$kappa[!is.na(college_close_four$father_college)])
+
+mean(college_close_four$nofather_college)
+## Complier No father
+mean(college_close_four$nofather_college * college_close_four$kappa)/
+  mean(college_close_four$kappa[!is.na(college_close_four$nofather_college)])
+
+```
+The compliers also seemed to receive have a father that attened college and had fewer observations who didnt have a father that attened college. 
+
+
+```{r}
+mean(college_close_four$score)
+## Complier Score
+mean(college_close_four$score * college_close_four$kappa)/
+  mean(college_close_four$kappa[!is.na(college_close_four$score)])
+```
+The compliers had a much large score then the general population 
+
+
+```{r}
+
+college_close_four['mom_college'] <- college_close_four$mcollege == "yes"
+college_close_four["nomom_college"] <- college_close_four$mcollege == "no"
+
+mean(college_close_four$m_college)
+## Complier Mom College
+mean(college_close_four$m_college * college_close_four$kappa)/
+  mean(college_close_four$kappa[!is.na(college_close_four$mom_college)])
+
+mean(college_close_four$nom_college)
+## Complier No Mom College
+mean(college_close_four$nom_college * college_close_four$kappa)/
+  mean(college_close_four$kappa[!is.na(college_close_four$nomom_college)])
+
+```
+The compliers seemed to have less moms that went to college
+
+Yes compliers noticeably differ from the general subset. Conidtional on 20 mile distance and 4 years of college experience we seem to have students who have a lower income status, their parents have a distinct difference in college experience and they seem to score higher. 
+
+### Question 4 (5 points)
+
+Return to the linear model from Question 1 (using a continuous measure of distance and of education). Examine whether the exogeneity assumption is plausible. You should consider any or all of the covariates provided. Discuss and evaluate whether there are any confounders of the education-distance relationship and explain why the presence of confounding would bias your estimates. 
+
+Then, estimate the first-stage effect of distance after adjusting (adjusting via a linear regression model is fine). Provide a 95\% confidence interval for the marginal effect of distance and interpret your results. Compare your estimated effect. Is the instrument stronger or weaker after adjusting for covariates? Is there still evidence of an effect of distance even after adjustment?
+
+It seems that the exogeneity assumption is not plausible because their are . 
+
+```{r}
+lm_robust( education~ mcollege+fcollege+score+income+ distance, data = college)
+```
+The instument is weaker we add the covariates to our first stage estimate, there this is evidence of an effect of distance, our confidence interval of -.05, -.01 does not contain zero so we would reject the null of no treatment effect with a 95% confidence. 
+
+\pagebreak
+
+# Problem 2 (25 points)
+
+How do people translate personal experiences into political attitudes? Exploring this question has been frustrated by the non-random assignment of social and economic phenomena such as crime, the economy, education, health care or taxation. [Egan and Mullin 2013](https://www.journals.uchicago.edu/doi/abs/10.1017/S0022381612000448) look specifically at the topic of Americans' beliefs about the evidence for global warming. 
+
+The full citation for this paper is
+
+> Egan, Patrick J., and Megan Mullin. "Turning personal experience into political attitudes: The effect of local weather on Americans’ perceptions about global warming." The Journal of Politics 74, no. 3 (2012): 796-809.
+
+They examine whether exposure to abnormally warm temperatures has an effect on whether Americans believe that there is solid evidence that the earth is getting warmer. They use Pew survey data from five months between June 2006 and April 2008.
+
+The variables of interest are:
+  
+- `ddt_week` - Treatment variable (Average daily departure from normal local temperature (in Fahrenheit) in week prior to survey)
+- `getwarmord` - Opinion on whether there is "solid evidence" for global warming i.e., the earth getting warmer (no = 1, mixed/some/don't know = 2, yes = 3). 
+- `wave` - Month in which survey was conducted (1=June 2006, 2=July 2006, 3=August 2006, 4=January 2007, 5=April 2008). 
+
+Below is the code to import the dataset into R
+```{r, echo=T, message=F}
+library(tidyverse)
+library(haven)
+library(estimatr)
+
+### Load in the Egan and Mullin (2013) dataset
+gwdataset <- read_dta("gwdataset.dta")
+
+```
+
+### Question 1 (5 points)
+
+About 99\% of mean daily departure from normal temperatures are between $-10$ and $20$ degrees fahrenheit. Subset the data down to only those observations (drop the extreme observations with mean daily deviations above 20 or below -10). Use this data for the remainder of the whole problem.
+
+```{r}
+
+q2_data <- subset(gwdataset, (ddt_week >=  -10) & (ddt_week <= 20))
+```
+
+First assume that local temperature deviations are assigned as-good-as randomly. Estimate the marginal average treatment effect of a one degree increase in local temperature deviation on the probability that respondents believe that there is "solid evidence" for global warming (that is, answer "yes" to the survey question). Assume a linear functional form for the conditional expectation of the outcome given the treatment. 
+
+Provide a 95\% confidence interval for your estimate and interpret your results.
+```{r}
+q2_data["yes"] = q2_data$getwarmord == 3
+lm_robust( yes ~ ddt_week , data = q2_data)
+```
+The marginal average treatment effect of one degree change to the average weekly tempature changes the opinion of solid evidence for by .003. The confidence interval ranges from .0001, .002. We would reject the null of no treatment effect because our confidence interval does not contain 0 and our p-value is less than .05.
+
+### Question 2 (5 points)
+
+Consider the possibility that the treatment of interest has as non-linear associationship with the outcome. In other words, the marginal average effect of a one degree increase in local temperature deviation might vary ($E[Y_i(1) - Y_i(0)]$ might be different from $E[Y_i(2) - Y_i(1)]$ for example). 
+
+Create a binned scatterplot for the conditional probability that a respondent believes there is "solid evidence" for global warming conditional on `ddt_week` (choose a reasonable bin size to capture any possible curvature in the conditional probability. Overlay your regression line from Question 1 on top of the binned scatterplot. Discuss whether the linearity assumption gives a reasonable approximation to the underlying conditional expectation function.
+```{r}
+
+x <- q2_data$getwarmord
+y <- q2_data$yes
+bin_scatter <- ggplot(aes(x = ddt_week, y=getwarmord), data=q2_data) +
+  stat_summary_bin(fun.y = 'mean', bins=50,
+                    size=2, geom='point') +
+  geom_smooth(data=q2_data, formula= y ~ x, method="lm_robust") +
+  geom_vline(xintercept=0, col="red")+
+  xlab("Average Weekly Tempeture") +
+  ylab("Opinion on Global Warming") +
+  theme_bw()
+
+bin_scatter
+```
+I do no believe the linearity assumption holds because at the ends of our subset we see that the opinions of the user changes in a non-linear direction.
+
+### Question 3 (5 points)
+
+Instead of looking at `ddt_week` as a continuous treatment variable, let's instead consider estimating the effect of a particular coarsening of the treatment: the occurrence of an extreme positive temperature abnormality (a heat wave). Define a heat wave as a week with an average daily departure from normal local temperature above $10$ degrees. Estimate the average treatment effect of exposure to a heat wave in the week prior to the survey on a respondent's belief that there is strong evidence for global warming (again, assuming complete ignorability). Provide a 95\% confidence interval and interpret your results. 
+
+```{r}
+heatwave <- subset(q2_data, ddt_week >= 10)
+lm_robust(yes ~ ddt_week, data = heatwave)
+
+```
+Conditional on a heat wave, we have a .014 estimate for the increase in year opinions. We would reject the null of no treatment effect because our confidence interval of .004, .02 does not contain 0.
+
+### Question 4 (5 points)
+
+This paper combines data from 5 different Pew surveys from 2006-2008. It may be the case that there is something different across survey waves such that complete ignorability is an unreasonable assumption. Choose an appropriate set of analyses to evaluate whether survey wave is a confounder. Interpret your results and discuss whether complete ignorability of `ddt_week` is a reasonable assumption.
+
+Note: Remember that `wave` is a discrete indicator variable for survey month/year. You will want to convert `wave` into an appropriate set of dummy indicator variables that denote each wave.
+
+```{r}
+q2_data <- q2_data %>% 
+  mutate(fifth = case_when(wave == 5  ~ 1,
+                          wave != 5 ~ 0),
+         fourth = case_when(wave == 4 ~ 1,
+                           wave != 4 ~ 0),
+         third = case_when(wave == 3 ~ 1,
+                           wave != 3 ~ 0),
+         second = case_when(wave == 2 ~ 1, 
+                           wave != 2~ 0),
+         one = case_when(wave == 1 ~ 1,
+         wave != 1 ~ 0))
+ q2_data= q2_data %>% unite("strata", fifth, fourth, third, second, one, remove = FALSE)
+table(q2_data$strata)
+
+lm_robust(yes ~ ddt_week, subset = wave == 5, data = q2_data )
+
+lm_robust(yes ~ ddt_week, subset = wave == 4, data = q2_data )
+
+lm_robust(yes ~ ddt_week, subset = wave == 3, data = q2_data )
+
+lm_robust(yes ~ ddt_week, subset = wave == 2, data = q2_data )
+
+lm_robust(yes ~ ddt_week, subset = wave == 1, data = q2_data )
+```
+
+Doing a balance check we notice that as the wave increase over time from 1 to 5 we start seeing larger and larger effect. This could be due to time or some other unobserved covariate
+
+### Question 5 (5 points)
+
+Suppose instead that we assume that excess temperatures are *conditionally* ignorable given survey wave. We will now consider adjusting for survey wave. Estimate the average treatment effect of experiencing a heat wave (`ddt_week > 10`) including one-way survey wave fixed effects. Report a 95\% confidence interval and interpret your result.
+
+```{r}
+q2_data["heatwave"] <- q2_data$ddt_week >= 10
+lm_robust(yes ~ heatwave + as.factor(wave), data = q2_data)
+```
+The effect of experience a heatwave conditionally on the wave is .04 and a confidence interval that ranges .007, .07 we would reject the null of no treatment effect conditioned on the survey wave.
+
+
+Then, estimate the average treatment effect of experiencing a heat wave (``ddt_week > 10`) using the Lin (2013) estimator (de-meaning the fixed effects and interacting them with the treatment). Report a 95\% confidence interval and interpret your results.
+
+Discuss any differences you observe between the two estimates and explain why they might be different.
+
+
+```{r}
+strat_reg <-lm_lin(yes ~ heatwave, covariates = ~wave, data = q2_data, se_type = "HC3")
+strat_reg
+
+
+```
+
+OUr Point estimate of .1 is much larger than our our previous estimate, this might be different because the demeaning nature of the lin estimar draws out the true effects of the heatwave on opinions of climate change. Our confidence interval ranges from .05, .14 much larger since we have reduced our bias we have increased our variance. We would still reject the null with a 95% level.
+
+
+\pagebreak
+
+# Problem 3 (10 points)
+
+Consider a case with a binary treatment $D_i \in \{0, 1\}$ and binary outcome $Y_i \in \{0, 1\}$. Define potential outcomes as follows (the consistency/SUTVA assumption):
+
+$$
+Y_i = \begin{cases} Y_i(1) \text{ if }  D_i = 1\\
+Y_i(0) \text{ if } D_i = 0
+\end{cases}
+$$
+
+We can observe two conditional probabilities directly from the data: $Pr(Y_i = 1 | D_i = 1)$ and $Pr(Y_i = 1 | D_i = 0)$. Assume that $0 < Pr(Y_i = 1 | D_i = 1) < 1$ and $0 < Pr(Y_i = 1 | D_i = 0) < 1$ (in other words, in either treatment arm we don't observe all $1$s or all $0$s in the outcome).
+
+We also directly observe the share of units assigned to treatment and control respectively. $Pr(D_i = 1)$ and $Pr(D_i = 0)$. Remember that $Pr(D_i = 1) + Pr(D_i = 0) = 1$.
+
+Suppose our goal is to identify the average treatment effect $\tau$, which in the case of a binary $Y_i$ is equal to a difference in two probabilities.
+
+$$
+\tau = E[Y_i(1)] - E[Y_i(0)] = Pr(Y_i(1) = 1) - Pr(Y_i(0) = 1)
+$$
+
+However, suppose we *cannot* assume that $D_i$ is randomly assigned (ignorability of treatment). In this problem we're going to explore what the bounds on the treatment effect are in such a situation where ignorability is not satisfied.
+
+### Question 1 (5 points)
+
+Consider the quantity $Pr(Y_i(1) = 1)$. $Pr(Y_i(1) = 1)$ itself cannot be directly observed but it can be expressed as the combination of some quantities that *can* be directly observed/known from the data and some quantities that cannot (without additional assumptions -- remember, we are not assuming ignorability holds).
+
+Decompose $Pr(Y_i(1) = 1)$ into these known and unknown probabilities (Hint: Use law of total probability). 
+
+$$
+Pr(Y_i(1) = 1) = Pr(Y_i(0) = 1) - \tau
+$$
+Replace tau its expected value
+
+$$
+Pr(Y_i(1) = 1) = Pr(Y_i(0) = 1) - (E[Y_i(1)] - E[Y_i(0)] )
+$$
+
+
+
+We know that to find the expected value of an outcome is its realized outcome times the probably of its occurence
+
+$$
+Pr(Y_i(1) = 1) = Pr(Y_i(0) = 1) - Y_i(1) * Pr(D_i = 1) + Y_i(0) * Pr(D_i = 1)
+$$
+
+We know: 
+$Y_i(1)$
+$Pr(D_i = 1)$
+$Y_i(0)$
+
+We don't know:
+$Pr(Y_i(0) = 1)$
+
+
+Assuming that any unknown probabilities take on their smallest possible value, what is the smallest possible value that $Pr(Y_i(1) = 1)$ can take on? 
+It will take on a number close to 1 because the probabilities cannot be greater than 1, .75 would a releazed value
+
+Assuming that any unknown probabilities take on their largest possible value, what is the largest possible value that $Pr(Y_i(1) = 1)$ can take on?
+
+it would take a number close to zero around .25
+
+- Hint: Remember that probabilities, by definition, cannot be greater than $1$ or less than $0$.
+- Hint 2: The answers are not $0$ and $1$ - we have *some* information from the data that we can use to narrow the bounds on $Pr(Y_i(1) = 1)$. 
+
+### Question 2 (5 points)
+
+Use a similar approach from Question 1 to find the bounds on $Pr(Y_i(0) = 1)$.
+
+Suppose $Pr(Y_i(1) = 1)$ were set to its largest possible value and $Pr(Y_i(0) = 1)$ were set to its smallest possible value -- this gives us an upper bound on the average treatment effect $\tau$. 
+THe lowest bound would be .1
+
+Conversely, suppose $Pr(Y_i(1) = 1)$ were set to its smallest possible value and $Pr(Y_i(0) = 1)$ were set to its largest possible value -- this gives us a lower bound on the average treatment effect $\tau$.
+It would be set to a value close to one around .9.
+
+Find these bounds. Is $0$ always in between the upper and lower bounds? Can we conclude anything about the direction of the treatment effect from the bounds alone?
+No, we can't conclue that the direction of the treatment effct from the bounds alone.
+
+
+
